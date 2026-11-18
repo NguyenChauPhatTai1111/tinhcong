@@ -4,6 +4,8 @@ export const money = (value: number) =>
 export const number = (value: number) =>
   new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 }).format(value);
 export const hours = (minutes: number) => `${number(minutes / 60)} giờ`;
+export const duration = (minutes: number) =>
+  `${Math.floor(minutes / 60)} giờ${minutes % 60 ? ` ${minutes % 60} phút` : ""}`;
 export const today = () => format(new Date(), "yyyy-MM-dd");
 export const currentMonth = () => format(new Date(), "yyyy-MM");
 export const dateLabel = (date: string, pattern = "dd/MM/yyyy") =>

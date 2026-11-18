@@ -15,7 +15,7 @@ import { Empty } from "./components/common/UI";
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Employees = lazy(() => import("./pages/Employees"));
 const Attendance = lazy(() => import("./pages/Attendance"));
-const Payroll = lazy(() => import("./pages/Payroll"));
+const TimeSummary = lazy(() => import("./pages/TimeSummary"));
 const Settings = lazy(() => import("./pages/Settings"));
 export default function App() {
   return (
@@ -36,8 +36,12 @@ export default function App() {
                   <Route index element={<Dashboard />} />
                   <Route path="nhan-vien" element={<Employees />} />
                   <Route path="cham-cong" element={<Attendance />} />
-                  <Route path="bang-luong" element={<Payroll />} />
-                  <Route path="lich-su" element={<Payroll history />} />
+                  <Route path="tong-hop" element={<TimeSummary />} />
+                  <Route
+                    path="bang-luong"
+                    element={<Navigate to="/tong-hop" replace />}
+                  />
+                  <Route path="lich-su" element={<TimeSummary history />} />
                   <Route path="cai-dat" element={<Settings />} />
                   <Route
                     path="*"
@@ -74,7 +78,9 @@ function AuthGate({ children }: { children: ReactNode }) {
     const from = location.state?.from;
     const destination =
       typeof from === "string" &&
-      /^\/(nhan-vien|cham-cong|bang-luong|lich-su|cai-dat)?$/.test(from)
+      /^\/(nhan-vien|cham-cong|tong-hop|bang-luong|lich-su|cai-dat)?$/.test(
+        from,
+      )
         ? from
         : "/";
     return <Navigate to={destination} replace />;

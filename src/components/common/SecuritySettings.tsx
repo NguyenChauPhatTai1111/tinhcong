@@ -62,7 +62,7 @@ export function SecuritySettings() {
         </div>
         <p className="hint">
           Mật khẩu không được lưu trên trình duyệt. Không có chức năng lấy lại
-          mật khẩu nếu thiếu bản sao lưu có thể mở được. CSV và phiếu lương đã
+          mật khẩu nếu thiếu bản sao lưu có thể mở được. CSV và bảng giờ công đã
           xuất là dữ liệu đọc được, hãy cất giữ cẩn thận.
         </p>
       </section>

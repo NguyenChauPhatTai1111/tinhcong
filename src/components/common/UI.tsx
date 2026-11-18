@@ -45,10 +45,16 @@ export function Button({
     </button>
   );
 }
-export function Submit({ children }: { children: ReactNode }) {
+export function Submit({
+  children,
+  disabled = false,
+}: {
+  children: ReactNode;
+  disabled?: boolean;
+}) {
   const { saving } = useApp();
   return (
-    <button type="submit" className="btn primary" disabled={saving}>
+    <button type="submit" className="btn primary" disabled={saving || disabled}>
       {saving && <LoaderCircle size={17} className="spin" />}
       {children}
     </button>
@@ -60,12 +66,14 @@ export function Modal({
   children,
   onClose,
   wide = false,
+  className = "",
 }: {
   title: string;
   subtitle?: string;
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
+  className?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null),
     titleId = useId();
@@ -85,7 +93,7 @@ export function Modal({
     <dialog
       ref={ref}
       aria-labelledby={titleId}
-      className={`modal ${wide ? "wide" : ""}`}
+      className={`modal ${wide ? "wide" : ""} ${className}`}
       onCancel={onClose}
       onClick={(e) => {
         if (e.target === ref.current) {

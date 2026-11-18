@@ -4,10 +4,11 @@ import { Clock3, Sparkles } from "lucide-react";
 import type { Attendance } from "../../types";
 import { useApp } from "../../contexts/AppContext";
 import { Button, Field, Modal, Submit } from "../common/UI";
-import { dateLabel, hours, money, today } from "../../utils/format";
+import { dateLabel, hours, duration, today } from "../../utils/format";
 import { localISO, shiftMinutes } from "../../utils/timeCalculator";
-import { rateAt, salary } from "../../utils/salaryCalculator";
 import { saveAttendance } from "../../services/storage";
+import { outstandingPayrollBefore } from "../../services/monthlyPayrollGate";
+import { MonthlyPayrollNotice } from "../common/MonthlyPayrollNotice";
 export function AttendanceForm({
   row,
   initialDate,
@@ -26,6 +27,8 @@ export function AttendanceForm({
     [endTime, setEndTime] = useState(
       row ? dateLabel(row.end, "HH:mm") : "17:00",
     );
+  const blockedByPreviousMonth =
+    outstandingPayrollBefore(data, date.slice(0, 7)).length > 0;
   const [explicitEnd, setExplicitEnd] = useState(
     !!row &&
       dateLabel(row.end, "yyyy-MM-dd") !== dateLabel(row.start, "yyyy-MM-dd"),
@@ -49,12 +52,9 @@ export function AttendanceForm({
     [reason, setReason] = useState(row?.adjustmentReason ?? "");
   const [notes, setNotes] = useState(row?.notes ?? "");
   const employee = data.employees.find((e) => e.id === employeeId);
-  const hourlyRate =
-    row?.employeeId === employeeId
-      ? row.hourlyRate
-      : employee
-        ? rateAt(employee, date)
-        : 0;
+  const [breakKind, setBreakKind] = useState<"lunch" | "other">(
+    row?.breakKind ?? "lunch",
+  );
   let start = "",
     end = "",
     calculated = 0,
@@ -70,8 +70,7 @@ export function AttendanceForm({
   } catch (e) {
     error = (e as Error).message;
   }
-  const minutes = manual ? actual : calculated,
-    amount = salary(minutes || 0, hourlyRate);
+  const minutes = manual ? actual : calculated;
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (error) return toast(error, true);
@@ -85,16 +84,15 @@ export function AttendanceForm({
       breakMinutes: hasBreak ? breakMins : 0,
       actualMinutes: minutes,
       adjustmentReason: manual ? reason.trim() : "",
-      hourlyRate,
-      amount,
+      hourlyRate: row?.hourlyRate ?? 0,
+      amount: row?.amount ?? 0,
+      breakKind: hasBreak ? breakKind : undefined,
       notes: notes.trim(),
     };
     if (
       await mutate(
         (d) => saveAttendance(d, shift),
-        row
-          ? "Đã cập nhật ca làm và tính lại lương nháp."
-          : "Đã lưu chấm công.",
+        row ? "Đã cập nhật ca làm và tổng giờ công." : "Đã lưu chấm công.",
       )
     )
       onClose();
@@ -102,11 +100,16 @@ export function AttendanceForm({
   return (
     <Modal
       title={row ? "Chỉnh sửa chấm công" : "Chấm công mới"}
-      subtitle="Giờ làm và tiền lương được tính tự động."
+      subtitle="Nhập giờ vào, giờ ra và thời gian nghỉ thực tế của từng người."
       onClose={onClose}
     >
       <form onSubmit={submit}>
         <div className="modal-body form-grid">
+          <MonthlyPayrollNotice
+            targetMonth={date.slice(0, 7)}
+            onResolve={onClose}
+            compact
+          />
           <Field label="Ngày làm việc *">
             <input
               required
@@ -200,6 +203,19 @@ export function AttendanceForm({
               </Field>
             )}
           </div>
+          {hasBreak && (
+            <Field label="Loại nghỉ" className="full">
+              <select
+                value={breakKind}
+                onChange={(e) =>
+                  setBreakKind(e.target.value as "lunch" | "other")
+                }
+              >
+                <option value="lunch">Có nghỉ trưa</option>
+                <option value="other">Nghỉ giữa ca / việc riêng</option>
+              </select>
+            </Field>
+          )}
           <label className="check-field full">
             <input
               type="checkbox"
@@ -244,7 +260,6 @@ export function AttendanceForm({
               <span>
                 <Sparkles size={16} /> Kết quả tự động
               </span>
-              <span>{money(hourlyRate)} / giờ</span>
             </div>
             <div>
               <span>Thời gian có mặt</span>
@@ -268,13 +283,12 @@ export function AttendanceForm({
               <span>
                 <Clock3 size={19} /> Giờ làm thực tế
               </span>
-              <strong>{error ? "—" : hours(minutes || 0)}</strong>
+              <strong>{error ? "—" : duration(minutes || 0)}</strong>
             </div>
-            <div className="calculation-total">
-              <span>Tiền lương trong ngày</span>
-              <strong>{error ? "—" : money(amount)}</strong>
-            </div>
-            {row && <small>Giữ đơn giá đã lưu cho nhân viên của ca này.</small>}
+            <small>
+              Giờ thực tế = thời gian có mặt − thời gian nghỉ. Thời gian nghỉ
+              tùy từng ca, không cố định.
+            </small>
           </div>
           <Field label="Ghi chú" className="full">
             <textarea
@@ -288,7 +302,7 @@ export function AttendanceForm({
         </div>
         <footer>
           <Button onClick={onClose}>Hủy</Button>
-          <Submit>Lưu chấm công</Submit>
+          <Submit disabled={blockedByPreviousMonth}>Lưu chấm công</Submit>
         </footer>
       </form>
     </Modal>

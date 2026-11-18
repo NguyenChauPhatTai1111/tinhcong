@@ -3,11 +3,11 @@ import { format, parseISO } from "date-fns";
 import {
   CalendarDays,
   List,
-  LockKeyhole,
   Pencil,
   Plus,
   Search,
   Trash2,
+  LockKeyhole,
   X,
 } from "lucide-react";
 import type { Attendance as Shift } from "../types";
@@ -21,9 +21,11 @@ import {
   PageHeading,
 } from "../components/common/UI";
 import { AttendanceForm } from "../components/attendance/AttendanceForm";
-import { dateLabel, hours, money, monthDays, today } from "../utils/format";
+import { dateLabel, hours, duration, monthDays, today } from "../utils/format";
+import { lunchLabel, presenceMinutes } from "../utils/timeSummary";
 import { sum } from "../utils/salaryCalculator";
 import { removeAttendance } from "../services/storage";
+import { calculatedShiftIds } from "../services/wages";
 export default function Attendance() {
   const { data, month, mutate } = useApp(),
     [employee, setEmployee] = useState("all"),
@@ -32,6 +34,7 @@ export default function Attendance() {
     [view, setView] = useState("list");
   const [form, setForm] = useState<Shift | "new" | null>(null),
     [deleting, setDeleting] = useState<Shift | null>(null);
+  const calculatedIds = calculatedShiftIds(data);
   const filtered = (data.attendance[month] ?? []).filter((s) => {
     const e = data.employees.find((e) => e.id === s.employeeId);
     return (
@@ -60,22 +63,23 @@ export default function Attendance() {
               <th>Giờ vào / ra</th>
               <th>Nghỉ</th>
               <th>Giờ thực tế</th>
-              <th>Tiền lương</th>
+              <th>Nghỉ trưa / Ghi chú</th>
               <th aria-label="Thao tác" />
             </tr>
           </thead>
           <tbody>
             {items.map((s, i) => {
               const e = data.employees.find((e) => e.id === s.employeeId)!;
-              const locked = data.payroll[month]?.some(
-                (p) => p.employeeId === s.employeeId && p.confirmed,
-              );
+              const calculated = calculatedIds.has(s.id);
               return (
                 <tr key={s.id}>
                   <td data-label="Ngày">
                     {dateLabel(s.date)}
-                    {locked && (
-                      <LockKeyhole className="inline-icon" size={12} />
+                    {calculated && (
+                      <small className="muted">
+                        <LockKeyhole size={11} className="inline-icon" /> Đã
+                        tính lương
+                      </small>
                     )}
                   </td>
                   <td data-label="Nhân viên">
@@ -103,31 +107,31 @@ export default function Attendance() {
                     {s.breakMinutes ? hours(s.breakMinutes) : "Không"}
                   </td>
                   <td data-label="Giờ thực tế" className="semibold">
-                    {hours(s.actualMinutes)}
+                    {duration(s.actualMinutes)}
                     {s.adjustmentReason && (
                       <small className="muted" title={s.adjustmentReason}>
                         Đã điều chỉnh
                       </small>
                     )}
                   </td>
-                  <td data-label="Tiền lương" className="semibold">
-                    {money(s.amount)}
-                    <small className="muted">{money(s.hourlyRate)} / giờ</small>
+                  <td data-label="Nghỉ trưa / Ghi chú" className="report-note">
+                    {lunchLabel(s)}
+                    <small className="muted">{s.notes || "—"}</small>
                   </td>
                   <td className="actions">
                     <button
                       className="icon-btn"
-                      disabled={locked}
                       aria-label={`Sửa ca ${e.name} ${s.date}`}
-                      title={locked ? "Bảng lương đã chốt" : "Sửa ca làm"}
+                      disabled={calculated}
+                      title={calculated ? "Ca đã tính lương" : "Sửa ca làm"}
                       onClick={() => setForm(s)}
                     >
                       <Pencil size={16} />
                     </button>
                     <button
                       className="icon-btn red"
-                      disabled={locked}
                       aria-label={`Xóa ca ${e.name} ${s.date}`}
+                      disabled={calculated}
                       onClick={() => setDeleting(s)}
                     >
                       <Trash2 size={16} />
@@ -142,7 +146,7 @@ export default function Attendance() {
     ) : (
       <Empty
         title="Chưa có ca làm trong thời gian này"
-        description="Chọn ngày và thêm ca làm. Giờ công, tiền lương sẽ được tính tự động."
+        description="Chọn ngày và thêm ca làm. Tổng giờ thực tế được tự động trừ thời gian nghỉ."
         action={
           <Button className="primary" onClick={openNew}>
             <Plus size={17} /> Chấm công mới
@@ -178,12 +182,12 @@ export default function Attendance() {
         </div>
         <div>
           <span>Tổng giờ thực tế</span>
-          <strong>{hours(sum(rows, (s) => s.actualMinutes))}</strong>
+          <strong>{duration(sum(rows, (s) => s.actualMinutes))}</strong>
         </div>
         <div>
-          <span>Tổng tiền lương</span>
+          <span>Tổng thời gian có mặt</span>
           <strong className="text-blue">
-            {money(sum(rows, (s) => s.amount))}
+            {duration(sum(rows, presenceMinutes))}
           </strong>
         </div>
       </div>
@@ -310,7 +314,7 @@ export default function Attendance() {
           <span>
             {rows.length} ca làm · {hours(sum(rows, (s) => s.actualMinutes))}
           </span>
-          <strong>{money(sum(rows, (s) => s.amount))}</strong>
+          <strong>{duration(sum(rows, (s) => s.actualMinutes))}</strong>
         </div>
       </section>
       {form && (
@@ -330,14 +334,14 @@ export default function Attendance() {
             if (
               await mutate(
                 (d) => removeAttendance(d, deleting),
-                "Đã xóa ca và tính lại bảng lương nháp.",
+                "Đã xóa ca và cập nhật tổng giờ công.",
               )
             )
               setDeleting(null);
           }}
         >
-          Ca làm ngày {dateLabel(deleting.date)} sẽ bị xóa. Bảng lương chưa chốt
-          của nhân viên trong tháng sẽ được cập nhật lại.
+          Ca làm ngày {dateLabel(deleting.date)} sẽ bị xóa. Tổng giờ của nhân
+          viên trong tuần và tháng sẽ được cập nhật lại.
         </Confirm>
       )}
     </>

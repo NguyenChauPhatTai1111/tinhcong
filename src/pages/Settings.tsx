@@ -21,7 +21,7 @@ import {
   Submit,
   Modal,
 } from "../components/common/UI";
-import { download, money, monthLabel, today } from "../utils/format";
+import { download, duration, monthLabel, today } from "../utils/format";
 import {
   ensureMonth,
   monthBackup,
@@ -179,8 +179,7 @@ export default function Settings() {
               <div>
                 <h3>Toàn bộ dữ liệu</h3>
                 <p>
-                  Nhân viên, chấm công, bảng lương và cài đặt của tất cả các
-                  tháng.
+                  Nhân viên, chấm công, lịch sử và cài đặt của tất cả các tháng.
                 </p>
               </div>
               <Button className="primary" onClick={() => backup()}>
@@ -386,10 +385,13 @@ export default function Settings() {
           }}
         >
           File hợp lệ có {pending.employees.length} nhân viên,{" "}
-          {Object.values(pending.attendance).flat().length} ca làm, tổng tiền
-          các ca{" "}
-          {money(
-            sum(Object.values(pending.attendance).flat(), (s) => s.amount),
+          {Object.values(pending.attendance).flat().length} ca làm, tổng giờ
+          thực tế{" "}
+          {duration(
+            sum(
+              Object.values(pending.attendance).flat(),
+              (s) => s.actualMinutes,
+            ),
           )}
           . Các kỳ:{" "}
           {Object.keys(pending.attendance).map(monthLabel).join("; ") ||

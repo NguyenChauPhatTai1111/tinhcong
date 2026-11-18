@@ -1,128 +1,115 @@
-# Công Việt — Quản lý chấm công & tính lương
+# Công Việt — Chấm công & tổng hợp giờ làm
 
-Ứng dụng React + TypeScript chạy hoàn toàn trên trình duyệt, không cần backend, database hay API. Mặc định dữ liệu trống. Không có số liệu demo trong thống kê.
+Ứng dụng React + TypeScript chạy trên trình duyệt, không có backend hay API nghiệp vụ. Admin ghi nhận giờ làm, giờ nghỉ, tổng hợp giờ công và bấm tính lương riêng cho từng nhân viên bằng đơn giá tự nhập. Mặc định không có dữ liệu demo.
 
 ## Cài đặt và chạy
 
-Yêu cầu Node.js 22.12+ (khuyến nghị Node.js 24), npm, trình duyệt hiện đại.
+Yêu cầu Node.js 22.12+ (khuyến nghị Node.js 24), npm và trình duyệt hiện đại.
 
 ```sh
 npm ci
 npm run dev
+npm test
+npm run build
+npm run preview
 ```
 
-Mở URL Local do Vite hiển thị. Trên PowerShell nếu `npm.ps1` bị chặn, dùng `npm.cmd` thay `npm`.
+Mở URL Local mà Vite hiển thị. Nếu PowerShell chặn `npm.ps1`, dùng `npm.cmd` thay cho `npm`. Build nằm trong `dist/`, có thể phục vụ bằng máy chủ static/Laragon. Dùng HashRouter nên không cần rewrite đường dẫn.
 
-```sh
-npm test             # Unit test logic nghiệp vụ
-npm run build        # Kiểm tra TypeScript + build production
-npm run preview      # Xem bản production
-npx playwright install chromium
-npm run test:e2e     # Kiểm thử trình duyệt
-```
+**Mã hóa yêu cầu localhost hoặc HTTPS**. Với tên miền Laragon như `tinhcong.test`, hãy bật HTTPS. Không mở trực tiếp qua `file://`.
 
-E2E dùng cổng 5174, có thể tái sử dụng dev server của project trên cổng đó. Không dùng cổng này cho ứng dụng khác khi chạy E2E. Có thể chỉ định Chromium sẵn có bằng biến môi trường `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.
+## Cách sử dụng
 
-Build xuất vào `dist/`. Có thể phục vụ thư mục này bằng máy chủ static hoặc Laragon. Ứng dụng dùng HashRouter nên reload đường dẫn không cần cấu hình rewrite. **Mã hóa yêu cầu HTTPS hoặc localhost**. Với tên miền Laragon như `tinhcong.test`, hãy bật HTTPS; HTTP trên tên miền thông thường không cung cấp Web Crypto. Không mở `index.html` bằng `file://`.
+Bấm nút xanh **Hướng dẫn sử dụng** ở góc dưới bên phải để mở popup, kể cả tại trang đăng nhập. Popup tự chọn chủ đề phù hợp với trang đang xem, có tìm kiếm hỗ trợ tiếng Việt có/không dấu, 8 nhóm hướng dẫn, ví dụ giờ nghỉ/tính lương và câu hỏi thường gặp. Dùng nút Trước/Tiếp, chọn chủ đề hoặc bấm liên kết để mở đúng trang cần thao tác. Đóng bằng Đã hiểu, dấu X hoặc Escape.
 
-## Đăng nhập và bảo mật
+Trang Tổng quan có 3 ô **Thêm nhân viên → Chấm công → Tính lương**, kèm số liệu và gợi ý bước tiếp theo từ dữ liệu hiện có. Trên điện thoại, thanh điều hướng dưới cùng cho mở nhanh Tổng quan/Nhân viên/Chấm công/Tính lương. Ở trang Tổng hợp giờ công, bấm **Xem cách làm** để mở thẳng hướng dẫn nút tính lương.
 
-- Mở lần đầu sẽ vào trang **Thiết lập quản trị viên**. Tự đặt tên đăng nhập và mật khẩu dài tối thiểu 12 ký tự; không có tài khoản/mật khẩu mặc định. Tên đăng nhập gồm 3–40 ký tự chữ không dấu, số, `.`, `_`, `-`.
-- Nếu đã có dữ liệu từ bản cũ, hồ sơ/ca làm/bảng lương được kiểm tra, mã hóa và thay thế nguyên tử trong cùng key. Không xóa dữ liệu cũ trước khi bản mã được ghi thành công. Nếu hết dung lượng hoặc dữ liệu cũ hỏng, giữ nguyên bản gốc; có thể tải bản gốc hoặc khôi phục file từ trang đăng nhập.
-- Đăng nhập để mở các trang quản lý. Đăng xuất/khóa ngay ở header hoặc Cài đặt. Khóa giải mã chỉ nằm trong bộ nhớ phiên, không ghi vào localStorage/sessionStorage/cookie. Tải lại trang phải đăng nhập lại. Truy cập trực tiếp URL riêng cũng cần đăng nhập.
-- Tự khóa sau 15 phút không hoạt động. Khi dữ liệu thay đổi ở tab khác, khóa phiên hiện tại để tránh tiếp tục làm việc trên dữ liệu cũ; đăng nhập lại để đọc bản mới.
-- **Cài đặt → Bảo mật & đăng nhập → Đổi thông tin đăng nhập**: nhập mật khẩu hiện tại và mật khẩu mới. Toàn bộ dữ liệu được mã hóa lại với salt/khóa mới, sau đó yêu cầu đăng nhập lại. Nếu ghi thất bại, bản mã và mật khẩu cũ vẫn có hiệu lực.
-- JSON sao lưu toàn bộ/tháng mặc định được mã hóa, mở bằng mật khẩu tại thời điểm xuất. Nhập file sẽ hỏi mật khẩu của bản sao lưu, kiểm tra nội dung rồi mới yêu cầu xác nhận ghi đè. Import không đổi tài khoản hiện tại. Vẫn hỗ trợ JSON chưa mã hóa từ bản cũ. Có thể khôi phục từ trang đăng nhập khi mất dữ liệu trình duyệt hoặc chuyển thiết bị.
-- **Không thể lấy lại mật khẩu** từ ứng dụng. Hãy cất mật khẩu và bản sao lưu ở nơi an toàn. Backup xuất trước khi đổi mật khẩu vẫn cần mật khẩu cũ. Tạo backup mới sau khi đổi mật khẩu. CSV và phiếu lương/PDF được xuất ở dạng đọc được, cần tự bảo vệ.
+1. **Đăng nhập**: lần đầu tự tạo tài khoản quản trị viên, không có mật khẩu mặc định. Tên đăng nhập 3–40 ký tự chữ không dấu, số, `.`, `_`, `-`; mật khẩu tối thiểu 12 ký tự. Lần mở tiếp theo nhập tài khoản đã tạo.
+2. **Nhân viên**: nhập tên, mã riêng, ngày bắt đầu và thông tin liên hệ/ghi chú tùy chọn. Không cần nhập đơn giá. Có tìm kiếm, sửa, xem chi tiết, bật/tắt làm việc và lưu trữ mềm để giữ lịch sử.
+3. **Chấm công**: chọn ngày, nhân viên, giờ vào và giờ ra. Mặc định không trừ giờ nghỉ. Nếu có nghỉ, bật “Có nghỉ trưa / nghỉ giữa ca”, nhập số giờ nghỉ thực tế và chọn loại nghỉ. Có thể nhập `0,5`, `0.5`, `1,5`... Mỗi ca có thời gian nghỉ khác nhau.
+4. **Ghi chú**: chọn “Có nghỉ trưa” hoặc “Nghỉ giữa ca / việc riêng” và nhập ghi chú thêm. Bảng chấm công hiển thị rõ giờ nghỉ, trạng thái nghỉ trưa, ghi chú và giờ thực tế.
+5. **Tổng hợp giờ công / Tính lương**: chọn theo tháng, theo tuần hoặc khoảng ngày bất kỳ. Tuần bắt đầu thứ Hai, kết thúc Chủ nhật. Mỗi dòng nhân viên có nút **Tính lương**: nhập đơn giá riêng cho lần này, xem tiền dự kiến và bấm **Xác nhận tính lương**. Tiền = tổng phút chưa tính × đơn giá / 60, làm tròn đến đồng. Không cần thiết lập đơn giá trong hồ sơ.
+   Sau khi lưu thành công, nút đổi thành **Đã tính lương** và bị disable; vẫn giữ trạng thái sau reload/đăng nhập lại. Nhân viên khác không bị ảnh hưởng. Bấm **Xem kết quả** để xem giờ/đơn giá/tiền đã lưu, in hoặc xuất CSV. Bấm Hủy hoặc lưu thất bại không đánh dấu đã tính.
+   Hệ thống theo dõi từng ca đã tính để không tính trùng khi đổi bộ lọc tuần/tháng/khoảng ngày. Nếu có ca mới, nút được bật để tính riêng phần công mới; giờ cũ được bỏ qua. Các ca đã tính lương bị khóa sửa/xóa để giữ đúng kết quả. “Đã tính lương” chỉ xác nhận đã tính, không phải thao tác chuyển tiền hay xác nhận đã thanh toán.
+6. **Chi tiết / in / CSV**: xem chi tiết từng ngày, in bảng giờ công hoặc xuất CSV tổng hợp/chi tiết có BOM UTF-8 cho Excel. CSV giờ công có số phút và số giờ; CSV trong “Xem kết quả” có thêm đơn giá, số tiền và thời điểm tính lương.
+7. **Lịch sử giờ công**: xem lại các tháng cũ. Sửa/xóa ca chưa tính lương sẽ cập nhật tổng giờ của các bộ lọc liên quan. Ca đã tính lương giữ nguyên snapshot.
+8. **Cài đặt & sao lưu**: đổi thông tin đăng nhập, sáng/tối, tên không gian làm việc; xuất/nhập JSON mã hóa toàn bộ hoặc từng tháng.
 
-Mã hóa dùng Web Crypto: AES-256-GCM, IV ngẫu nhiên 12 byte mới cho mỗi lần ghi; khóa dẫn xuất từ mật khẩu bằng PBKDF2-HMAC-SHA256 600.000 vòng với salt ngẫu nhiên 32 byte. Khóa không cho phép export; metadata quan trọng được xác thực qua additional authenticated data. GCM phát hiện thay đổi trái phép đối với dữ liệu mã hóa. Tham khảo [Web Crypto trên MDN](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/deriveKey) và [hướng dẫn PBKDF2 của OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#pbkdf2).
+Ví dụ đúng theo nhu cầu:
 
-Đây là đăng nhập mở khóa dữ liệu **trên thiết bị**, không phải xác thực/phân quyền do máy chủ kiểm soát. Mã hóa giúp bảo vệ dữ liệu khi chưa đăng nhập, không chống được mã độc/XSS/extension độc hại đang chạy trong phiên đã mở khóa, mật khẩu yếu bị đoán offline, hoặc người có quyền xóa/ghi đè dữ liệu trình duyệt. Không có chống brute-force hoặc thu hồi phiên tập trung như hệ thống backend. Nếu cần nhiều tài khoản, dữ liệu dùng chung hoặc bảo mật phía máy chủ, cần bổ sung backend.
+| Giờ làm             | Thời gian nghỉ | Giờ thực tế   |
+| ------------------- | -------------- | ------------- |
+| 04:00–08:00         | 0,5 giờ        | 3 giờ 30 phút |
+| 04:00–08:00         | Không nghỉ     | 4 giờ         |
+| 08:00–20:00         | 1 giờ          | 11 giờ        |
+| 20:00–06:00 hôm sau | 1,5 giờ        | 8 giờ 30 phút |
 
-## Luồng sử dụng
+## Quy tắc thời gian
 
-1. **Nhân viên**: thêm họ tên, mã riêng, ngày bắt đầu và lương theo giờ. Có tìm kiếm, xem chi tiết, sửa thông tin và bật/tắt làm việc. Lưu trữ là xóa mềm; có thể khôi phục, lịch sử không bị xóa.
-2. **Chấm công**: chọn tháng/ngày, nhân viên, giờ vào/ra và số giờ nghỉ (có thể nhập 0,5 hoặc 1,5; cũng hỗ trợ dấu chấm). Giờ công không cố định theo ngày: 08:00–20:00 là 12 giờ, hôm sau 08:00–16:00 là 8 giờ nếu không nghỉ. Mặc định không trừ giờ nghỉ; bật nghỉ giữa ca để nhập số giờ cần trừ. Giờ nghỉ được quy đổi và làm tròn đến phút khi tính/lưu, giữ nguyên cấu trúc dữ liệu cũ. Giờ ra sớm hơn hoặc bằng giờ vào mặc định thuộc ngày kế tiếp. Chọn ngày kết thúc riêng cho ca cần nhập rõ ngày. Một nhân viên có nhiều ca/ngày, nhưng không được trùng thời gian kể cả qua tháng. Bảng và lịch tháng dùng chung dữ liệu.
-3. **Bảng lương**: chọn kỳ và nhân viên hoặc tất cả, nhấn tính lương. Các ca được cộng theo số tiền đã lưu, không nhân tổng giờ với lương hiện tại. Có thưởng, phụ cấp, khấu trừ và ghi chú bắt buộc nếu điều chỉnh. Có thể xem từng ca, in phiếu và xuất CSV UTF-8 có BOM.
-4. **Chốt lương**: sau xác nhận, snapshot được giữ nguyên; khóa thêm/sửa/xóa chấm công và điều chỉnh lương của nhân viên trong kỳ. Chốt là thao tác cuối, ứng dụng không có tự động mở khóa. Cần kiểm tra kỹ trước khi chốt.
-5. **Thanh toán**: chỉ bảng lương đã chốt mới được đánh dấu đã trả. Lưu thời điểm thanh toán; chuyển lại chưa trả cần xác nhận và xóa thời điểm đã trả. Việc này không thay đổi tiền trong snapshot.
-6. **Lịch sử lương**: chọn bất kỳ kỳ nào hoặc bấm thẻ kỳ để xem nhân viên, giờ công, số tiền và tình trạng thanh toán. Không xóa dữ liệu khi đổi tháng/năm.
-7. **Cài đặt & sao lưu**: xuất JSON mã hóa toàn bộ hoặc một tháng, nhập JSON có kiểm tra dữ liệu, xem trước và xác nhận ghi đè. Đổi thông tin đăng nhập, giao diện sáng/tối và tên không gian làm việc.
+**Bắt buộc hoàn tất lương tháng cũ:** trước khi tạo hoặc sửa ca thuộc tháng mới, hệ thống kiểm tra toàn bộ giờ công của các tháng trước đó. Chỉ cần còn một ca có giờ thực tế lớn hơn 0 chưa được xác nhận tính lương của bất kỳ nhân viên nào (kể cả đã nghỉ/lưu trữ), việc lưu ca tháng mới sẽ bị chặn. Ràng buộc dùng chung cho tất cả nhân viên và được kiểm tra cả ở form lẫn hàm lưu dữ liệu; không phụ thuộc một cờ mở khóa trong giao diện.
 
-Mọi thao tác được mã hóa và ghi vào localStorage trước khi UI báo thành công. Nếu ghi thất bại do dung lượng/quyền lưu trữ, ứng dụng báo lỗi và giữ dữ liệu cũ. Ghi dữ liệu được tuần tự hóa, dùng Web Locks khi trình duyệt hỗ trợ và kiểm tra bản đang lưu để tránh ghi đè âm thầm. Khi có thay đổi từ tab khác, yêu cầu đăng nhập lại. Không đóng/tải lại trang khi còn hiển thị “Đang mã hóa…”.
+Thông báo chỉ rõ tháng, số người và giờ công còn thiếu. Nút **Tính lương tháng MM/YYYY** đưa về đúng tháng cũ nhất còn thiếu, đặt chế độ Theo tháng và bỏ lọc nhân viên để xử lý đầy đủ. Khi tính đủ mọi ca còn lại, chấm công tháng mới tự mở. Tính theo tuần đã xong một phần tháng chưa đủ để mở nếu còn ca khác. Tháng không có công hoặc chỉ có 0 phút thực tế không cần tính lương.
 
-## Quy tắc tính toán
+Có thể bổ sung/sửa công trong tháng cũ đang hoàn tất (ca đã tính lương vẫn khóa sửa/xóa). Nếu thêm công cũ chưa tính, ràng buộc tháng mới sẽ áp dụng lại. Quy tắc vẫn đúng khi bỏ lỡ nhiều tháng, đổi tháng 12 sang tháng 1 hoặc tải lại/khôi phục dữ liệu. Kỳ mới vẫn được tạo nhưng không tự chốt lương, không xóa dữ liệu cũ; dữ liệu tháng mới đã có sẵn trong bản sao lưu vẫn được giữ để xem.
 
-- Lưu giờ vào/ra dưới dạng ISO UTC; form hiển thị giờ địa phương của thiết bị. `date` là ngày bắt đầu ca được chọn và quyết định kỳ tính lương. Ca qua tháng được tính **toàn bộ vào tháng bắt đầu**, không chia ca giữa hai kỳ.
-- Thời gian thực tế lưu bằng số phút nguyên: `(kết thúc − bắt đầu) / 60.000 − phút nghỉ`.
-- Thời gian nghỉ không âm, không lẻ phút và không vượt thời lượng ca.
-- Điều chỉnh phút làm phải có lý do và trong khoảng 0 đến toàn bộ thời lượng ca.
-- Tiền mỗi ca: `Math.round(phút thực tế × đơn giá / 60)`. Tổng tháng cộng các khoản nguyên đồng của từng ca; các khoản thưởng/phụ cấp/khấu trừ là số nguyên đồng.
-- Đơn giá có lịch sử `effectiveFrom`. Khi thêm ca, lấy mức gần nhất có hiệu lực vào ngày ca. Sửa giờ/ngày của ca thuộc cùng nhân viên giữ nguyên đơn giá snapshot; đổi nhân viên sẽ lấy đơn giá của nhân viên được chọn. Thay đổi đơn giá không sửa ca cũ, kể cả khi ngày hiệu lực ở quá khứ.
-- Bảng lương nháp được tính lại khi sửa/xóa ca. Nếu giảm ca khiến khấu trừ vượt tổng thu nhập, thay đổi bị từ chối; hãy giảm khoản khấu trừ trong bản nháp trước. Ứng dụng không tự ý sửa khoản điều chỉnh.
-- Nhân viên nghỉ việc không được tạo ca mới; vẫn sửa được các ca đã có nếu kỳ chưa khóa.
-- Thống kê lương bao gồm các bảng lương nháp phát sinh từ ca đã lưu và các bảng lương đã tính. Tổng thanh toán chỉ cộng bảng lương đã đánh dấu trả.
-- Mỗi 15 giây và khi quay lại tab/cửa sổ, kiểm tra ngày. Khi sang tháng mới, khởi tạo kỳ mới và chuyển bộ lọc kỳ hiện tại, giữ mọi kỳ cũ; không chốt hoặc trả lương tự động. Nếu ứng dụng đóng, việc này diễn ra khi mở lần tiếp theo.
+- Không có số giờ làm/nghỉ cố định mỗi ngày. Tổng giờ thực tế = thời gian có mặt − thời gian nghỉ của chính ca đó.
+- Thời gian nghỉ nhập theo giờ, hỗ trợ dấu phẩy hoặc chấm thập phân; quy đổi và làm tròn đến phút khi lưu. Toàn bộ tổng hợp cộng số phút nguyên trước khi hiển thị giờ/phút.
+- Giờ ra sớm hơn hoặc bằng giờ vào được hiểu là ngày hôm sau. Có ô chọn ngày kết thúc riêng nếu cần.
+- Không cho phép nghỉ vượt thời gian có mặt, phút âm, ca trùng giờ hoặc tạo ca trước ngày vào làm. Nhiều ca trong một ngày được phép nếu không trùng nhau.
+- Có thể điều chỉnh phút thực tế thủ công, phải có lý do và không vượt toàn bộ thời gian có mặt.
+- Ca qua tháng/tuần được tính toàn bộ theo **ngày bắt đầu ca**, không chia ca giữa hai kỳ. Giờ vào/ra lưu ISO UTC, form hiển thị giờ địa phương của thiết bị.
+- Mỗi 15 giây và khi quay lại tab/cửa sổ, nhận biết ngày mới và khởi tạo kỳ tháng hiện tại nếu chưa có. Không xóa các tháng/năm cũ.
+- Các bộ lọc theo tuần và khoảng ngày lấy ca từ tất cả kỳ lưu trữ, nên hỗ trợ đầy đủ tuần vượt tháng/năm.
 
-## Lưu trữ và schema
+## Bảo mật và sao lưu
 
-Một key `congviet:data` chứa envelope mã hóa, ghi nguyên tử bằng một lần `localStorage.setItem`:
+Dữ liệu trong localStorage và JSON sao lưu được mã hóa bằng AES-256-GCM. Mỗi lần ghi dùng IV ngẫu nhiên 12 byte mới. Khóa được dẫn xuất từ mật khẩu bằng PBKDF2-HMAC-SHA256 600.000 vòng, salt ngẫu nhiên 32 byte; khóa không cho export và chỉ nằm trong bộ nhớ phiên. Metadata quan trọng được xác thực qua additional authenticated data. Tham khảo [Web Crypto trên MDN](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/deriveKey) và [OWASP về PBKDF2](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#pbkdf2).
 
-```ts
-{
-  format: 'congviet-vault', version: 1, username: string,
-  kdf: 'PBKDF2-SHA256', iterations: 600000, salt: string,
-  cipher: 'AES-256-GCM', iv: string, ciphertext: string
-}
-```
+- Mọi trang quản lý đều cần đăng nhập, kể cả mở URL trực tiếp. Tải lại trang phải đăng nhập lại. Có đăng xuất/khóa ngay và tự khóa sau 15 phút không hoạt động.
+- Đổi mật khẩu yêu cầu mật khẩu hiện tại, mã hóa lại dữ liệu với salt/khóa mới rồi đăng xuất. Không ghi mật khẩu/khóa vào localStorage, sessionStorage hay cookie.
+- Ghi mã hóa thành công trước khi UI thông báo đã lưu. Ghi thất bại giữ nguyên dữ liệu cũ. Khi dữ liệu đổi ở tab khác, khóa phiên và yêu cầu đăng nhập lại để tránh ghi đè dữ liệu cũ.
+- JSON sao lưu dùng mật khẩu tại lúc xuất. Khi nhập, hỏi mật khẩu file, kiểm tra cấu trúc/giá trị/tham chiếu rồi mới xác nhận ghi đè. Vẫn hỗ trợ bản sao lưu chưa mã hóa từ phiên bản cũ. Import dữ liệu không đổi tài khoản hiện tại.
+- **Khôi phục thay thế toàn bộ dữ liệu**, kể cả bản sao lưu một tháng; không tự gộp kỳ. Hãy sao lưu toàn bộ trước khi nhập. File tháng kèm hồ sơ nhân viên dùng chung. Nếu có lần tính lương theo tuần vượt tháng, file kèm toàn bộ snapshot và các ca nguồn của lần tính đó, kể cả phần ngày ở tháng kế cận, để giữ đúng kết quả và tránh tính trùng.
+- Không có chức năng lấy lại mật khẩu. Quên mật khẩu có thể không mở được dữ liệu nếu không có bản sao lưu truy cập được. Backup cũ vẫn cần mật khẩu cũ; nên tạo backup mới sau khi đổi mật khẩu.
+- CSV và bản in/PDF là dữ liệu đọc được, hãy tự cất giữ an toàn.
 
-Tên đăng nhập và metadata mã hóa không phải bí mật; mọi dữ liệu nghiệp vụ nằm trong `ciphertext`. Không lưu mật khẩu hoặc khóa giải mã. Sau giải mã, payload có schema nghiệp vụ:
+Đây là bảo vệ dữ liệu cục bộ trên thiết bị. Không có xác thực/phân quyền tập trung của máy chủ; không chống được mã độc/XSS/extension độc hại trong phiên đã mở khóa, mật khẩu yếu bị đoán offline hoặc người có quyền xóa dữ liệu trình duyệt. Muốn nhiều tài khoản, dữ liệu dùng chung hoặc phân quyền trên máy chủ cần backend.
 
-```ts
-{
-  version: 2,
-  employees: Employee[],
-  attendance: { [month: 'YYYY-MM']: Attendance[] },
-  payroll: { [month: 'YYYY-MM']: Payroll[] },
-  settings: { theme: 'light' | 'dark', company: string }
-}
-```
+localStorage không phải lưu trữ vĩnh viễn. Xóa dữ liệu trình duyệt, chế độ ẩn danh, đổi hồ sơ hoặc đổi origin (giao thức/tên miền/cổng) có thể khiến dữ liệu không còn truy cập được. Dữ liệu `localhost:5173` khác `localhost:5174` và tên miền Laragon. Hãy sao lưu định kỳ.
 
-Interfaces đầy đủ: `src/types/index.ts`. Hồ sơ nhân viên độc lập với kỳ. Mỗi ca lưu đơn giá và số tiền. Bảng lương đã chốt chứa tên/mã, bản sao các ca, phút làm, các khoản điều chỉnh, số tiền và thời điểm chốt/trả.
+## Schema và tương thích phiên bản cũ
 
-`migrate()` trong `src/services/storage/index.ts` hỗ trợ schema nghiệp vụ v1 (cùng các entity, thiếu settings) → v2 bằng cách bổ sung cài đặt mặc định. Phiên bản envelope mã hóa độc lập với schema nghiệp vụ. Từ chối phiên bản không hỗ trợ. Sau giải mã, import kiểm tra cấu trúc, kiểu dữ liệu, số nguyên, ngày, tham chiếu, mã trùng, ca trùng, số tiền và tính nhất quán snapshot đã chốt trước khi cho phép ghi đè. JSON hỏng không bị âm thầm thay bằng dữ liệu trống: giữ bản gốc và hướng dẫn khôi phục trên trang đăng nhập.
+Key duy nhất `congviet:data` chứa envelope mã hóa phiên bản 1. Payload sau giải mã dùng schema nghiệp vụ **v4**, gồm `employees`, `attendance` theo `YYYY-MM`, `payroll` lưu trữ từ phiên bản cũ, `wageCalculations` chứa kết quả tính lương theo từng nhân viên và `settings`. Envelope và schema nghiệp vụ có phiên bản độc lập.
 
-**Khôi phục là thay thế toàn bộ dữ liệu**, kể cả bản sao lưu chỉ một tháng; không tự gộp các kỳ. Sao lưu đầy đủ trước khi nhập. File tháng vẫn chứa hồ sơ nhân viên dùng chung để bảo toàn tham chiếu.
+`migrate()` hỗ trợ v1/v2/v3 → v4, giữ hồ sơ và các ca đã ghi, bổ sung `wageCalculations: []`. Dữ liệu lương/đơn giá cũ không bị xóa: các trường `rates`, `hourlyRate`, `amount` và `payroll` tiếp tục được giữ trong sao lưu để bảo toàn lịch sử. Hồ sơ mới có `rates: []`; ca mới có các trường tiền bằng 0 để tương thích cấu trúc cũ. Lần tính mới dùng đơn giá admin nhập trong modal và lưu snapshot riêng trong `wageCalculations`.
 
-localStorage phụ thuộc origin (giao thức + tên miền + cổng) và hồ sơ trình duyệt. Dữ liệu ở `localhost:5173` khác `localhost:5174` và tên miền Laragon. Dữ liệu không tự đồng bộ giữa thiết bị và không phải lưu trữ vĩnh viễn. Tự bảo quản bản sao lưu mã hóa và mật khẩu ở nơi phù hợp.
+Các bảng lương v1/v2 tiếp tục là bản lưu độc lập. Các kết quả tính bằng nút mới lưu tên/mã nhân viên, khoảng ngày, bản sao các ca, tổng phút, đơn giá, số tiền, ghi chú và thời điểm tính. Không cho cùng một ca xuất hiện trong hai kết quả. Import kiểm tra số tiền và snapshot trùng với ca nguồn trước khi ghi đè. `breakKind` lưu loại nghỉ; ca cũ chưa có loại nghỉ hiển thị “Chưa ghi rõ loại nghỉ” đến khi admin cập nhật.
 
-## Cấu trúc mã nguồn
+Migration/import kiểm tra phiên bản, kiểu dữ liệu, ngày, số phút, tham chiếu nhân viên, mã trùng, ca trùng và dữ liệu lịch sử. Bản gốc chỉ bị thay thế sau khi mã hóa và ghi thành công. Dữ liệu hỏng không bị âm thầm đặt lại thành dữ liệu trống; trang đăng nhập cho tải bản gốc và chọn backup để khôi phục.
+
+## Mã nguồn và kiểm thử
 
 ```text
 src/
-  components/
-    common/          # Form, dialog, toast, nút, bộ chọn kỳ
-    layout/          # Sidebar, header, menu mobile
-    attendance/      # Form chấm công và kết quả tính trực tiếp
-    payroll/         # Chi tiết, điều chỉnh, chốt, thanh toán, in
-  contexts/          # Phiên đăng nhập, khóa, trạng thái ứng dụng, ghi mã hóa, đổi tháng
-  pages/             # Tổng quan, nhân viên, chấm công, lương/lịch sử, cài đặt
-  services/storage/  # Schema, validation, migration, khóa kỳ, backup/restore
-  services/security/ # Web Crypto, PBKDF2, AES-GCM, kiểm tra envelope
-  types/             # Interfaces
-  utils/             # Tính giờ/lương, định dạng, xuất CSV
-  tests/             # Vitest
-e2e/                 # Playwright: thao tác thực tế và responsive
+  components/common/     # Field, modal, nút, bảo mật
+  components/layout/     # Sidebar, header, menu mobile
+  components/attendance/ # Form giờ vào/ra, nghỉ, ghi chú, tự tính giờ
+  contexts/              # Đăng nhập, phiên, ghi mã hóa, đổi tháng
+  pages/                 # Tổng quan, nhân viên, chấm công, tổng hợp, lịch sử, cài đặt
+  services/security/     # Web Crypto và envelope
+  services/storage/      # Validation, migration, ghi nhận/xóa ca, sao lưu
+  utils/timeSummary.ts   # Khoảng ngày, tổng hợp giờ, CSV
+  tests/                 # Unit test nghiệp vụ và mã hóa
+e2e/                     # Playwright: luồng thực tế, bảo mật, responsive
 ```
 
-Stack: React, TypeScript, Vite, Tailwind CSS, Lucide React, React Router DOM, date-fns, Recharts. Các trang được lazy load. Không gọi API nghiệp vụ hoặc tải font bên ngoài.
+Stack: React, TypeScript, Vite, Tailwind CSS, Lucide React, React Router DOM, date-fns, Recharts. Không gọi API nghiệp vụ hay tải font bên ngoài.
 
-## Kiểm thử
+```sh
+npx playwright install chromium
+npm run test:e2e
+```
 
-Vitest bao gồm các trường hợp bắt buộc: ca thường, ca không nghỉ, ca đêm, lương 11 giờ, thay đổi đơn giá giữa tháng, ca trùng/liền nhau, đổi năm, cập nhật tháng cũ, bảo toàn kỳ đã chốt, backup/restore, tháng 28/29/30/31 ngày và nghỉ vượt ca. Bổ sung validation, migration, làm tròn tiền, CSV, tham chiếu và bảo vệ snapshot.
+E2E dùng cổng 5174, có thể tái sử dụng dev server của đúng project trên cổng đó. Có thể dùng Chromium sẵn có qua biến `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`. Ảnh QA và PDF nằm trong `artifacts/` sau khi chạy.
 
-Unit test bảo mật kiểm tra round-trip mã hóa, mật khẩu sai, IV mới mỗi lần ghi, ciphertext/metadata bị sửa, đổi mật khẩu/salt, phiên bản/thuật toán không hợp lệ và yêu cầu mật khẩu.
-
-Playwright kiểm tra đăng nhập/setup, bảo toàn dữ liệu cũ khi migrate hoặc ghi thất bại, chặn URL khi chưa đăng nhập, đăng xuất/reload, đổi mật khẩu, backup cũ, tự khóa 15 phút và thay đổi từ tab khác. Luồng nghiệp vụ tiếp tục được kiểm tra qua đăng nhập: thêm nhân viên → reload → chấm công → lịch tháng → tính lương → thêm thưởng → chốt → thanh toán → reload → khóa ca → xuất/nhập JSON mã hóa. Responsive ở 1440/1024/768/390 px và lưu giao diện tối sau đăng nhập lại. Ảnh kiểm tra nằm trong `artifacts/` sau khi chạy.
-#   t i n h c o n g  
- 
+Unit test bao gồm ví dụ 04:00–08:00 nghỉ nửa tiếng, nghỉ linh hoạt, ca đêm, nhiều ca/ngày, trùng ca, tuần vượt tháng/năm, tháng 28/29/30/31 ngày, sửa/xóa công, migration giữ lịch sử cũ, backup/restore, CSV và mã hóa. E2E kiểm tra toàn bộ luồng nhân viên → công → tổng hợp tuần/tháng/khoảng ngày → sửa/xóa → reload/đăng nhập → CSV/in/backup, cùng các trường hợp bảo mật và responsive.

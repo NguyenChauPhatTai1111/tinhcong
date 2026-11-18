@@ -1,5 +1,197 @@
 @import "tailwindcss";
 
+.wage-actions {
+  display: flex;
+  gap: 7px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.wage-actions .btn {
+  font-size: 10px;
+  padding: 8px 10px;
+  min-height: 35px;
+}
+.btn.calculated-btn:disabled {
+  background: #eaf8f1;
+  border-color: #d2eddf;
+  color: #299b71;
+  opacity: 1;
+}
+.dark .btn.calculated-btn:disabled {
+  background: #1b3a35;
+  border-color: #285749;
+  color: #77cdb0;
+}
+.wage-record {
+  border: 1px solid var(--border);
+  padding: 17px;
+  border-radius: 10px;
+  margin-top: 20px;
+}
+.wage-record-heading {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.wage-record .detail-list {
+  margin-bottom: 18px;
+}
+.wage-record .table-wrap {
+  margin-top: 15px;
+}
+.wage-record > .info-note {
+  margin-top: 10px;
+}
+.wage-record-heading small {
+  font-size: 10px;
+}
+.wage-actions button {
+  flex-shrink: 0;
+}
+@media (max-width: 767px) {
+  .responsive-table .actions .wage-actions {
+    width: 100%;
+    gap: 7px;
+  }
+  .wage-record {
+    padding: 13px;
+  }
+  .wage-record h3 {
+    font-size: 12px;
+  }
+  .wage-record .compact-table td,
+  .wage-record .compact-table th {
+    font-size: 10px;
+    padding: 10px 7px;
+  }
+}
+@media print {
+  .wage-record {
+    break-inside: avoid;
+    border-color: #ddd;
+  }
+  .wage-record .table-wrap {
+    overflow: visible;
+  }
+  .wage-record-heading {
+    align-items: flex-start;
+  }
+}
+
+.time-filters {
+  padding: 20px 23px;
+  margin-bottom: 23px;
+}
+.time-filters > .segmented {
+  width: max-content;
+  max-width: 100%;
+  margin-bottom: 20px;
+}
+.time-filter-fields {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.time-filter-fields > .field {
+  min-width: 170px;
+  flex: 1;
+  max-width: 290px;
+}
+.time-filter-fields > .month-picker {
+  margin-bottom: 1px;
+}
+.summary-table {
+  margin-top: 20px;
+}
+.report-note {
+  white-space: normal;
+  min-width: 120px;
+  max-width: 250px;
+  overflow-wrap: anywhere;
+}
+.report-day {
+  margin: 22px 0;
+}
+.report-day > h3 {
+  margin-bottom: 12px;
+}
+.report-day > h3 small {
+  color: var(--muted);
+  font-weight: 400;
+}
+.hours-stat {
+  font-size: 23px;
+}
+.leader > b {
+  font-size: 11px;
+  white-space: nowrap;
+}
+.report-day .table-wrap {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+@media (max-width: 767px) {
+  .time-filters {
+    padding: 18px;
+  }
+  .time-filter-fields {
+    gap: 12px;
+  }
+  .time-filter-fields > .field {
+    min-width: 130px;
+    max-width: none;
+  }
+  .time-filters .segmented > button {
+    font-size: 11px;
+    padding: 9px 11px;
+  }
+  .hours-stat {
+    font-size: 19px;
+    line-height: 1.5;
+  }
+  .summary-table {
+    margin-top: 16px;
+  }
+  .report-day > h3 {
+    font-size: 12px;
+  }
+  .report-day .compact-table td,
+  .report-day .compact-table th {
+    padding: 10px 8px;
+  }
+  .report-day .report-note {
+    min-width: 90px;
+  }
+  .time-filter-fields > .month-picker {
+    flex: 1;
+  }
+  .leader > b {
+    font-size: 10px;
+  }
+  .mini-stat strong[data-testid="summary-worked"] {
+    font-size: 18px;
+  }
+}
+@media print {
+  .report-day {
+    break-inside: avoid;
+  }
+  .report-day .table-wrap {
+    overflow: visible;
+  }
+  .report-note {
+    max-width: none;
+    min-width: 0;
+  }
+  .payslip-heading {
+    flex-wrap: wrap;
+  }
+}
+
 .auth-page {
   min-height: 100dvh;
   display: grid;

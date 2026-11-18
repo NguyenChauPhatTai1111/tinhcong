@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AppData, Attendance, Employee, Payroll } from "../types";
+import type { AppData, Attendance, Employee } from "../types";
 import {
   emptyData,
   ensureMonth,
@@ -8,7 +8,6 @@ import {
   removeAttendance,
   restore,
   saveAttendance,
-  savePayroll,
   serialize,
 } from "../services/storage";
 import {
@@ -17,14 +16,17 @@ import {
   shiftMinutes,
   validDate,
 } from "../utils/timeCalculator";
+import { calculatePayroll } from "../utils/salaryCalculator";
+import { duration, monthDays } from "../utils/format";
 import {
-  calculatePayroll,
-  monthlyPayroll,
-  rateAt,
-  salary,
-} from "../utils/salaryCalculator";
-import { monthDays } from "../utils/format";
-import { payrollCSV } from "../utils/csv";
+  csvContent,
+  hoursCSV,
+  lunchLabel,
+  periodRange,
+  shiftsInRange,
+  summarizeHours,
+  totalMinutes,
+} from "../utils/timeSummary";
 const employee: Employee = {
   id: "employee-1",
   name: "Nguyễn Văn Huy",
@@ -34,328 +36,311 @@ const employee: Employee = {
   active: true,
   archived: false,
   notes: "",
-  rates: [{ effectiveFrom: "2026-01-01", amount: 30000 }],
+  rates: [],
 };
+function fixture(): AppData {
+  return { ...emptyData(), employees: [structuredClone(employee)] };
+}
 function shift(
   date = "2026-11-16",
-  start = "08:00",
-  end = "20:00",
-  breakMinutes = 60,
+  start = "04:00",
+  end = "08:00",
+  rest = 30,
   endDate = date,
-  rate = 30000,
 ): Attendance {
   const s = localISO(date, start),
-    e = localISO(endDate, end),
-    actualMinutes = shiftMinutes(s, e, breakMinutes);
+    e = localISO(endDate, end);
   return {
     id: crypto.randomUUID(),
     employeeId: employee.id,
     date,
     start: s,
     end: e,
-    breakMinutes,
-    actualMinutes,
+    breakMinutes: rest,
+    actualMinutes: shiftMinutes(s, e, rest),
     adjustmentReason: "",
-    hourlyRate: rate,
-    amount: salary(actualMinutes, rate),
+    hourlyRate: 0,
+    amount: 0,
     notes: "",
+    ...(rest ? { breakKind: "lunch" as const } : {}),
   };
 }
-function fixture(): AppData {
-  return { ...emptyData(), employees: [structuredClone(employee)] };
-}
-function withPayroll(confirmed = false): {
-  data: AppData;
-  row: Attendance;
-  payroll: Payroll;
-} {
-  let data = fixture();
-  const row = shift();
-  data = saveAttendance(data, row);
-  const payroll = {
-    ...calculatePayroll(employee, "2026-11", [row]),
-    confirmed,
-    confirmedAt: confirmed ? "2026-12-01T00:00:00.000Z" : null,
-  };
-  data = savePayroll(data, payroll);
-  return { data, row, payroll };
-}
-describe("Tính giờ và lương", () => {
-  it("08:00–20:00, nghỉ 60 phút = 11 giờ", () =>
-    expect(shift().actualMinutes).toBe(660));
-  it("08:00–17:00, không nghỉ = 9 giờ", () =>
-    expect(shift("2026-11-16", "08:00", "17:00", 0).actualMinutes).toBe(540));
-  it("giờ thực tế thay đổi theo từng ngày: 08–20 là 12 giờ, hôm sau 08–16 là 8 giờ nếu không nghỉ", () => {
-    const a = shift("2026-11-16", "08:00", "20:00", 0);
-    const b = shift("2026-11-17", "08:00", "16:00", 0);
-    expect(a.actualMinutes).toBe(720);
-    expect(b.actualMinutes).toBe(480);
-    const p = calculatePayroll(employee, "2026-11", [a, b]);
-    expect(p.minutes).toBe(1200);
-    expect(p.base).toBe(600000);
+describe("Giờ làm và nghỉ tùy từng ca", () => {
+  it("04:00–08:00 nghỉ nửa tiếng = 3 giờ 30 phút theo hội thoại", () => {
+    expect(shift().actualMinutes).toBe(210);
+    expect(duration(210)).toBe("3 giờ 30 phút");
   });
-  it("20:00–06:00 hôm sau, nghỉ 60 phút = 9 giờ", () =>
+  it("04:00–08:00 không nghỉ = 4 giờ", () =>
+    expect(shift("2026-11-16", "04:00", "08:00", 0).actualMinutes).toBe(240));
+  it("08:00–20:00 nghỉ 1 giờ = 11 giờ", () =>
+    expect(shift("2026-11-16", "08:00", "20:00", 60).actualMinutes).toBe(660));
+  it("08:00–16:00 không nghỉ = 8 giờ, không áp dụng giờ cố định", () =>
+    expect(shift("2026-11-17", "08:00", "16:00", 0).actualMinutes).toBe(480));
+  it("20:00–06:00 hôm sau nghỉ 1,5 giờ = 8 giờ 30 phút", () =>
     expect(
-      shift("2026-11-16", "20:00", "06:00", 60, "2026-11-17").actualMinutes,
-    ).toBe(540));
-  it("30.000đ/giờ × 11 giờ = 330.000đ", () =>
-    expect(salary(660, 30000)).toBe(330000));
-  it("làm tròn từng ca đến đồng", () => expect(salary(1, 1000)).toBe(17));
-  it("nghỉ vượt ca phải báo lỗi", () =>
-    expect(() => shift("2026-11-16", "08:00", "09:00", 61)).toThrow(
-      "Thời gian nghỉ",
-    ));
-  it("nghỉ âm và số phút lẻ bị từ chối", () => {
-    expect(() => shift("2026-11-16", "08:00", "09:00", -1)).toThrow();
-    expect(() => shift("2026-11-16", "08:00", "09:00", 0.5)).toThrow();
+      shift("2026-11-16", "20:00", "06:00", 90, "2026-11-17").actualMinutes,
+    ).toBe(510));
+  it("không cho nghỉ vượt ca, âm hoặc lẻ phút", () => {
+    for (const rest of [241, -1, 0.5, NaN])
+      expect(() => shift("2026-11-16", "04:00", "08:00", rest)).toThrow();
   });
-  it("giờ, ngày không hợp lệ bị từ chối", () => {
+  it("ngày, giờ nhập sai bị từ chối", () => {
     expect(() => localISO("2026-02-30", "08:00")).toThrow();
     expect(() => localISO("2026-11-16", "24:30")).toThrow();
     expect(validDate("2026-02-29")).toBe(false);
   });
-  it("kết thúc trước bắt đầu bị từ chối", () =>
+  it("kết thúc trước bắt đầu bị từ chối nếu chưa chọn hôm sau", () =>
     expect(() => shift("2026-11-16", "20:00", "06:00", 0)).toThrow());
-  it("cộng đúng đơn giá thay đổi giữa tháng", () => {
-    const e = {
-      ...employee,
-      rates: [
-        ...employee.rates,
-        { effectiveFrom: "2026-11-15", amount: 40000 },
-      ],
-    };
-    const a = shift(
-      "2026-11-14",
-      "08:00",
-      "17:00",
-      60,
-      "2026-11-14",
-      rateAt(e, "2026-11-14"),
-    );
-    const b = shift(
-      "2026-11-16",
-      "08:00",
-      "17:00",
-      60,
-      "2026-11-16",
-      rateAt(e, "2026-11-16"),
-    );
-    expect(calculatePayroll(e, "2026-11", [a, b]).base).toBe(560000);
-    expect(a.hourlyRate).toBe(30000);
-    expect(b.hourlyRate).toBe(40000);
-  });
-  it("đơn giá tương lai không áp dụng sớm", () =>
-    expect(
-      rateAt(
-        {
-          ...employee,
-          rates: [
-            ...employee.rates,
-            { effectiveFrom: "2027-01-01", amount: 50000 },
-          ],
-        },
-        "2026-12-31",
-      ),
-    ).toBe(30000));
-});
-describe("Ca làm và kỳ dữ liệu", () => {
-  it("hai ca trùng phải báo lỗi", () =>
-    expect(() => assertNoOverlap(shift(), [shift()])).toThrow("trùng"));
-  it("cho phép hai ca liền nhau", () =>
+  it("hai ca trùng giờ bị chặn; ca liền nhau được phép", () => {
+    expect(() => assertNoOverlap(shift(), [shift()])).toThrow("trùng");
     expect(() =>
-      assertNoOverlap(shift("2026-11-16", "12:00", "17:00", 0), [
-        shift("2026-11-16", "08:00", "12:00", 0),
-      ]),
-    ).not.toThrow());
-  it("phát hiện ca qua đêm trùng sang tháng tiếp theo", () => {
+      assertNoOverlap(shift("2026-11-16", "08:00", "12:00", 0), [shift()]),
+    ).not.toThrow();
+  });
+  it("phát hiện ca trùng qua đêm và qua tháng", () => {
     const d = saveAttendance(
       fixture(),
-      shift("2026-11-30", "20:00", "06:00", 60, "2026-12-01"),
+      shift("2026-11-30", "20:00", "06:00", 30, "2026-12-01"),
     );
     expect(() =>
       saveAttendance(d, shift("2026-12-01", "05:00", "08:00", 0)),
     ).toThrow("trùng");
   });
-  it("chuyển tháng 12 sang tháng 1 giữ lịch sử và không chốt lương", () => {
-    const d = saveAttendance(fixture(), shift("2026-12-31"));
-    const next = ensureMonth(d, "2027-01");
-    expect(next.attendance["2026-12"]).toHaveLength(1);
-    expect(next.attendance["2027-01"]).toEqual([]);
-    expect(next.payroll["2027-01"]).toEqual([]);
-  });
-  it("khởi tạo kỳ khi mở muộn không xóa tháng cũ", () => {
-    const d = saveAttendance(fixture(), shift("2026-11-16"));
-    const next = ensureMonth(d, "2027-04");
-    expect(next.attendance["2026-11"]).toHaveLength(1);
-    expect(next.attendance["2027-04"]).toEqual([]);
-    expect(ensureMonth(next, "2027-04")).toBe(next);
-  });
-  it.each([
-    ["2027-02", 28],
-    ["2028-02", 29],
-    ["2026-04", 30],
-    ["2026-01", 31],
-  ])("tháng %s có %i ngày", (month, days) =>
-    expect(monthDays(String(month))).toBe(days),
-  );
-  it("giờ điều chỉnh cần lý do và không vượt thời gian ca", () => {
+  it("điều chỉnh giờ phải có lý do và không vượt thời gian có mặt", () => {
     const row = shift();
     expect(() =>
-      saveAttendance(fixture(), { ...row, actualMinutes: 600, amount: 300000 }),
+      saveAttendance(fixture(), { ...row, actualMinutes: 200 }),
     ).toThrow("lý do");
     expect(() =>
       saveAttendance(fixture(), {
         ...row,
-        actualMinutes: 600,
-        amount: 300000,
+        actualMinutes: 200,
         adjustmentReason: "Về sớm",
       }),
     ).not.toThrow();
     expect(() =>
       saveAttendance(fixture(), {
         ...row,
-        actualMinutes: 1000,
+        actualMinutes: 500,
         adjustmentReason: "Sai",
       }),
     ).toThrow();
   });
-  it("ngày làm trước ngày vào làm bị chặn", () =>
+  it("không tạo ca trước ngày vào làm hoặc cho nhân viên đã nghỉ", () => {
     expect(() =>
       saveAttendance(
         { ...fixture(), employees: [{ ...employee, startDate: "2026-12-01" }] },
         shift(),
       ),
-    ).toThrow("bắt đầu"));
-});
-describe("Bảng lương nháp và snapshot", () => {
-  it("sửa tháng cũ tính lại bản nháp", () => {
-    const { data, row } = withPayroll();
-    const updated = saveAttendance(ensureMonth(data, "2027-01"), {
-      ...row,
-      actualMinutes: 600,
-      amount: 300000,
-      adjustmentReason: "Về sớm",
-    });
-    expect(updated.payroll["2026-11"][0].base).toBe(300000);
-    expect(updated.attendance["2027-01"]).toHaveLength(0);
-  });
-  it("xóa ca tính lại bảng lương chưa chốt, giữ thưởng", () => {
-    const { data, row } = withPayroll();
-    data.payroll["2026-11"][0].bonus = 50000;
-    data.payroll["2026-11"][0].total += 50000;
-    const updated = removeAttendance(data, row);
-    expect(updated.payroll["2026-11"][0].total).toBe(50000);
-    expect(updated.payroll["2026-11"][0].minutes).toBe(0);
-  });
-  it("không xóa ca nếu khấu trừ làm thực nhận âm, không tự sửa khấu trừ", () => {
-    const { data, row } = withPayroll();
-    data.payroll["2026-11"][0].deduction = 100000;
-    data.payroll["2026-11"][0].total -= 100000;
-    expect(() => removeAttendance(data, row)).toThrow("khấu trừ");
-    expect(data.attendance["2026-11"]).toHaveLength(1);
-    expect(data.payroll["2026-11"][0].deduction).toBe(100000);
-  });
-  it("không thay đổi snapshot khi mức lương hoặc dữ liệu nguồn thay đổi", () => {
-    const { payroll } = withPayroll(true);
-    const saved = serialize({
-      ...fixture(),
-      payroll: { "2026-11": [payroll] },
-    });
-    expect(
-      calculatePayroll(
-        { ...employee, name: "Tên mới" },
-        "2026-11",
-        [],
-        payroll,
-      ),
-    ).toBe(payroll);
-    expect(serialize({ ...fixture(), payroll: { "2026-11": [payroll] } })).toBe(
-      saved,
-    );
-  });
-  it("không sửa, xóa, thêm ca hoặc sửa lương trong kỳ đã chốt", () => {
-    const { data, row, payroll } = withPayroll(true);
-    expect(() => saveAttendance(data, row)).toThrow("đã chốt");
-    expect(() => removeAttendance(data, row)).toThrow("đã chốt");
-    expect(() => saveAttendance(data, shift("2026-11-17"))).toThrow("đã chốt");
-    expect(() => savePayroll(data, { ...payroll, bonus: 50000 })).toThrow(
-      "đã chốt",
-    );
-  });
-  it("không chuyển ca ra khỏi kỳ khóa", () => {
-    const { data, row } = withPayroll(true);
+    ).toThrow("bắt đầu");
     expect(() =>
-      saveAttendance(data, { ...shift("2026-12-01"), id: row.id }),
-    ).toThrow("đã chốt");
+      saveAttendance(
+        { ...fixture(), employees: [{ ...employee, active: false }] },
+        shift(),
+      ),
+    ).toThrow("nghỉ việc");
   });
-  it("thực nhận gồm thưởng, phụ cấp, khấu trừ", () => {
-    const { data, payroll } = withPayroll();
-    const p = {
-      ...payroll,
-      bonus: 100000,
-      allowance: 50000,
-      deduction: 30000,
-      notes: "Thưởng và phụ cấp",
-      total: 450000,
+  it("lưu ghi chú và loại nghỉ riêng cho từng ca", () => {
+    const s = {
+      ...shift(),
+      breakKind: "other" as const,
+      notes: "Đi việc riêng",
     };
-    expect(savePayroll(data, p).payroll["2026-11"][0].total).toBe(450000);
-  });
-  it("bảng lương từ ca đã lưu dùng đúng đơn giá gốc", () => {
-    const d = saveAttendance(fixture(), shift());
-    d.employees[0].rates[0].amount = 90000;
-    expect(monthlyPayroll(d, "2026-11")[0].base).toBe(330000);
+    const next = saveAttendance(fixture(), s);
+    expect(next.attendance["2026-11"][0].notes).toBe("Đi việc riêng");
+    expect(lunchLabel(s)).toBe("Không nghỉ trưa");
+    expect(lunchLabel(shift())).toBe("Có nghỉ trưa");
+    expect(lunchLabel({ ...shift(), breakKind: undefined })).toBe(
+      "Chưa ghi rõ loại nghỉ",
+    );
   });
 });
-describe("Sao lưu, migration và CSV", () => {
-  it("backup và restore giữ nguyên snapshot và số tiền", () => {
-    const { data } = withPayroll(true);
-    expect(restore(serialize(data))).toEqual(data);
-    expect(restore(serialize(data)).payroll["2026-11"][0].total).toBe(330000);
+describe("Tổng hợp tuần, tháng, khoảng ngày", () => {
+  it("tuần bắt đầu thứ Hai và kết thúc Chủ nhật, vượt tháng", () =>
+    expect(periodRange("week", "", "2026-11-30", "", "")).toEqual({
+      start: "2026-11-30",
+      end: "2026-12-06",
+    }));
+  it("tuần vượt năm vẫn giữ đủ ngày", () =>
+    expect(periodRange("week", "", "2027-01-01", "", "")).toEqual({
+      start: "2026-12-28",
+      end: "2027-01-03",
+    }));
+  it.each([
+    ["2027-02", 28],
+    ["2028-02", 29],
+    ["2026-04", 30],
+    ["2026-01", 31],
+  ])("tháng %s có %i ngày", (month, days) => {
+    expect(monthDays(String(month))).toBe(days);
+    expect(periodRange("month", String(month), "", "", "").end).toBe(
+      `${month}-${days}`,
+    );
   });
-  it("sao lưu từng tháng không mang ca tháng khác", () => {
-    const { data } = withPayroll();
-    const next = saveAttendance(data, shift("2026-12-01"));
-    const backup = restore(serialize(monthBackup(next, "2026-11")));
-    expect(Object.keys(backup.attendance)).toEqual(["2026-11"]);
-    expect(backup.employees).toHaveLength(1);
+  it("lọc khoảng ngày lấy cả hai đầu, bỏ ca ngoài kỳ", () => {
+    let d = fixture();
+    for (const date of ["2026-11-16", "2026-11-17", "2026-11-18"])
+      d = saveAttendance(d, shift(date));
+    const rows = shiftsInRange(
+      d,
+      periodRange("custom", "", "", "2026-11-16", "2026-11-17"),
+    );
+    expect(rows).toHaveLength(2);
+    expect(totalMinutes(rows)).toBe(420);
   });
-  it("migration v1 bổ sung settings, không đổi số tiền", () => {
-    const { data } = withPayroll();
-    const old = { ...data, version: 1, settings: undefined };
-    expect(migrate(old).version).toBe(2);
+  it("từ chối khoảng đảo ngày hoặc ngày/tháng sai", () => {
+    expect(() =>
+      periodRange("custom", "", "", "2026-11-18", "2026-11-16"),
+    ).toThrow();
+    expect(() => periodRange("month", "2026-13", "", "", "")).toThrow();
+    expect(() => periodRange("week", "", "", "", "")).toThrow();
+  });
+  it("tuần có thể cộng ca từ hai kỳ lưu trữ", () => {
+    let d = saveAttendance(fixture(), shift("2026-11-30"));
+    // Imported history may already span months before the monthly gate was introduced.
+    d.attendance["2026-12"] = [shift("2026-12-01")];
+    const rows = shiftsInRange(
+      d,
+      periodRange("week", "", "2026-12-01", "", ""),
+    );
+    expect(rows).toHaveLength(2);
+    expect(totalMinutes(rows)).toBe(420);
+  });
+  it("nhiều ca trong ngày chỉ đếm một ngày; cộng đủ nghỉ và giờ thực tế", () => {
+    const a = shift(),
+      b = shift("2026-11-16", "13:00", "17:00", 0);
+    const rows = summarizeHours(fixture(), [a, b]);
+    expect(rows[0]).toMatchObject({
+      days: 1,
+      presence: 480,
+      breaks: 30,
+      actual: 450,
+    });
+  });
+  it("ca qua tháng được tính theo ngày bắt đầu", () => {
+    const d = saveAttendance(
+      fixture(),
+      shift("2026-11-30", "20:00", "06:00", 60, "2026-12-01"),
+    );
+    expect(
+      shiftsInRange(d, { start: "2026-11-01", end: "2026-11-30" }),
+    ).toHaveLength(1);
+    expect(
+      shiftsInRange(d, { start: "2026-12-01", end: "2026-12-31" }),
+    ).toHaveLength(0);
+  });
+  it("hồ sơ lưu trữ vẫn xuất hiện khi có ca trong kỳ", () => {
+    const d = fixture();
+    d.employees[0].archived = true;
+    expect(summarizeHours(d, [shift()])).toHaveLength(1);
+    expect(summarizeHours(d, [])).toHaveLength(0);
+  });
+});
+describe("Lưu trữ, sửa lịch sử và bảo toàn dữ liệu cũ", () => {
+  it("nhân viên mới không cần đơn giá", () =>
+    expect(restore(serialize(fixture())).employees[0].rates).toEqual([]));
+  it("sửa/xóa ca cập nhật giờ, không thay đổi bản lưu tiền lương cũ", () => {
+    const original = { ...shift(), hourlyRate: 30000, amount: 105000 };
+    let d = saveAttendance(fixture(), original);
+    const payroll = {
+      ...calculatePayroll(employee, "2026-11", [original]),
+      confirmed: true,
+      confirmedAt: "2026-12-01T00:00:00.000Z",
+    };
+    d.payroll["2026-11"] = [payroll];
+    const before = JSON.stringify(d.payroll);
+    d = saveAttendance(d, {
+      ...original,
+      actualMinutes: 200,
+      adjustmentReason: "Sửa công cũ",
+    });
+    expect(totalMinutes(d.attendance["2026-11"])).toBe(200);
+    expect(JSON.stringify(d.payroll)).toBe(before);
+    d = removeAttendance(d, d.attendance["2026-11"][0]);
+    expect(totalMinutes(d.attendance["2026-11"])).toBe(0);
+    expect(JSON.stringify(d.payroll)).toBe(before);
+    expect(restore(serialize(d)).payroll["2026-11"][0]).toEqual(payroll);
+  });
+  it("migration v2 sang v3 giữ toàn bộ ca và bản lương cũ", () => {
+    const row = { ...shift(), hourlyRate: 30000, amount: 105000 },
+      e = {
+        ...employee,
+        rates: [{ effectiveFrom: employee.startDate, amount: 30000 }],
+      };
+    const old = {
+      ...fixture(),
+      version: 2,
+      employees: [e],
+      attendance: { "2026-11": [row] },
+      payroll: { "2026-11": [calculatePayroll(e, "2026-11", [row])] },
+    };
+    const migrated = migrate(old);
+    expect(migrated.version).toBe(4);
+    expect(migrated.employees).toEqual(old.employees);
+    expect(migrated.attendance).toEqual(old.attendance);
+    expect(migrated.payroll).toEqual(old.payroll);
+  });
+  it("migration v1 bổ sung cài đặt và giữ giờ", () => {
+    const old = {
+      ...fixture(),
+      version: 1,
+      settings: undefined,
+      employees: [
+        {
+          ...employee,
+          rates: [{ effectiveFrom: employee.startDate, amount: 30000 }],
+        },
+      ],
+    };
+    expect(migrate(old).version).toBe(4);
     expect(migrate(old).settings.theme).toBe("light");
-    expect(migrate(old).payroll["2026-11"][0].total).toBe(330000);
   });
-  it("từ chối phiên bản lạ và JSON sai cấu trúc", () => {
+  it("đổi tháng 12 sang tháng 1 hoặc mở muộn không xóa dữ liệu", () => {
+    const d = saveAttendance(fixture(), shift("2026-12-31"));
+    const next = ensureMonth(d, "2027-01");
+    expect(next.attendance["2026-12"]).toHaveLength(1);
+    expect(next.attendance["2027-01"]).toEqual([]);
+    expect(ensureMonth(next, "2027-04").attendance["2026-12"]).toHaveLength(1);
+  });
+  it("backup/restore không sai tổng phút và nghỉ trưa", () => {
+    const d = saveAttendance(fixture(), shift());
+    expect(restore(serialize(d))).toEqual(d);
+    expect(totalMinutes(restore(serialize(d)).attendance["2026-11"])).toBe(210);
+  });
+  it("backup một tháng vẫn giữ hồ sơ dùng chung", () => {
+    let d = saveAttendance(fixture(), shift());
+    d.attendance["2026-12"] = [shift("2026-12-01")];
+    const restored = restore(serialize(monthBackup(d, "2026-11")));
+    expect(Object.keys(restored.attendance)).toEqual(["2026-11"]);
+    expect(restored.employees).toHaveLength(1);
+  });
+  it("từ chối JSON, phiên bản, bản ghi trùng và loại nghỉ sai", () => {
     expect(() => restore("{")).toThrow();
     expect(() => migrate({ version: 99 })).toThrow("Phiên bản");
-    expect(() => migrate({ version: 2, employees: [] })).toThrow();
-  });
-  it("từ chối tiền bị sửa trong file backup", () => {
-    const { data } = withPayroll(true);
-    data.attendance["2026-11"][0].amount++;
-    expect(() => restore(serialize(data))).toThrow();
-  });
-  it("từ chối snapshot đã chốt bị thay đổi so với ca nguồn", () => {
-    const { data } = withPayroll(true);
-    data.payroll["2026-11"][0].shifts[0].notes = "Bị sửa";
-    expect(() => restore(serialize(data))).toThrow();
-  });
-  it("từ chối ca trùng và hồ sơ trùng trong backup", () => {
-    const { data } = withPayroll();
-    data.attendance["2026-11"].push(shift());
-    expect(() => restore(serialize(data))).toThrow();
-    const d = fixture();
-    d.employees.push(structuredClone(employee));
+    const d = saveAttendance(fixture(), shift());
+    d.attendance["2026-11"].push(shift());
     expect(() => restore(serialize(d))).toThrow();
+    const d2 = saveAttendance(fixture(), shift());
+    (
+      d2.attendance["2026-11"][0] as unknown as { breakKind: string }
+    ).breakKind = "invalid";
+    expect(() => restore(serialize(d2))).toThrow();
   });
-  it("CSV có BOM, escape dấu ngoặc kép và chặn công thức Excel", () => {
-    const { payroll } = withPayroll();
-    const content = payrollCSV([
-      { ...payroll, employeeName: '=HYPERLINK("x")' },
-    ]);
+});
+describe("CSV giờ công", () => {
+  it("BOM UTF8, cột giờ và phút chính xác, không có cột tiền", () => {
+    const content = hoursCSV(summarizeHours(fixture(), [shift()]), {
+      start: "2026-11-16",
+      end: "2026-11-16",
+    });
     expect(content.charCodeAt(0)).toBe(0xfeff);
+    expect(content).toContain('"210","3.5"');
+    expect(content).not.toContain("Lương");
+    expect(content).not.toContain("Đơn giá");
+  });
+  it("chặn công thức Excel và escape ký tự đặc biệt", () => {
+    const content = csvContent([['=HYPERLINK("x")', "Ghi chú, có dấu"]]);
     expect(content).toContain(`"'=HYPERLINK(""x"")"`);
-    expect(content).toContain("330000");
+    expect(content).toContain('"Ghi chú, có dấu"');
   });
 });

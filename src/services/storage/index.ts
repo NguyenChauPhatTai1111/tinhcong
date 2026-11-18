@@ -5,19 +5,17 @@ import {
   validDate,
   validMonth,
 } from "../../utils/timeCalculator";
-import {
-  calculatePayroll,
-  refreshDrafts,
-  salary,
-  sum,
-} from "../../utils/salaryCalculator";
+import { calculatePayroll, salary, sum } from "../../utils/salaryCalculator";
+import { assertNotCalculated, shiftSignature } from "../wages";
+import { assertPreviousPayrollComplete } from "../monthlyPayrollGate";
 export const STORAGE_KEY = "congviet:data";
 export function emptyData(): AppData {
   return {
-    version: 2,
+    version: 4,
     employees: [],
     attendance: {},
     payroll: {},
+    wageCalculations: [],
     settings: { theme: "light", company: "Không gian làm việc" },
   };
 }
@@ -46,8 +44,7 @@ export function saveAttendance(data: AppData, row: Attendance): AppData {
   const next = structuredClone(data),
     all = Object.values(next.attendance).flat();
   const old = all.find((s) => s.id === row.id);
-  if (old) assertUnlocked(data, old.employeeId, old.date.slice(0, 7));
-  assertUnlocked(data, row.employeeId, row.date.slice(0, 7));
+  if (old) assertNotCalculated(data, old.id);
   const employee = data.employees.find((e) => e.id === row.employeeId);
   if (!employee || row.date < employee.startDate)
     throw new Error("Ngày làm phải từ ngày nhân viên bắt đầu làm việc.");
@@ -69,10 +66,13 @@ export function saveAttendance(data: AppData, row: Attendance): AppData {
     !validDate(row.date) ||
     !Number.isSafeInteger(row.hourlyRate) ||
     row.hourlyRate < 0 ||
-    row.amount !== salary(row.actualMinutes, row.hourlyRate)
+    !Number.isSafeInteger(row.amount) ||
+    row.amount < 0 ||
+    (row.breakKind !== undefined && !["lunch", "other"].includes(row.breakKind))
   )
     throw new Error("Dữ liệu ca làm không hợp lệ.");
   assertNoOverlap(row, all);
+  assertPreviousPayrollComplete(data, row.date.slice(0, 7));
   for (const month of Object.keys(next.attendance))
     next.attendance[month] = next.attendance[month].filter(
       (s) => s.id !== row.id,
@@ -81,15 +81,15 @@ export function saveAttendance(data: AppData, row: Attendance): AppData {
   next.attendance[month] ??= [];
   next.payroll[month] ??= [];
   next.attendance[month].push(row);
-  return refreshDrafts(next);
+  return next;
 }
 export function removeAttendance(data: AppData, row: Attendance): AppData {
-  assertUnlocked(data, row.employeeId, row.date.slice(0, 7));
+  assertNotCalculated(data, row.id);
   const next = structuredClone(data);
   next.attendance[row.date.slice(0, 7)] = next.attendance[
     row.date.slice(0, 7)
   ].filter((s) => s.id !== row.id);
-  return refreshDrafts(next);
+  return next;
 }
 function check(condition: unknown): asserts condition {
   if (!condition)
@@ -102,7 +102,7 @@ const cash = (v: unknown) =>
   typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
 const record = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === "object" && !Array.isArray(v);
-function validateShift(s: Attendance, employees: Employee[]) {
+function validateShift(s: Attendance, employees: Employee[], legacy = false) {
   check(
     record(s) &&
       text(s.id) &&
@@ -124,20 +124,27 @@ function validateShift(s: Attendance, employees: Employee[]) {
       (minutes === s.actualMinutes || s.adjustmentReason.trim()) &&
       cash(s.hourlyRate) &&
       cash(s.amount) &&
-      s.amount === salary(s.actualMinutes, s.hourlyRate) &&
+      (!legacy || s.amount === salary(s.actualMinutes, s.hourlyRate)) &&
+      (s.breakKind === undefined || ["lunch", "other"].includes(s.breakKind)) &&
       text(s.notes),
   );
 }
 export function migrate(raw: unknown): AppData {
   check(record(raw));
-  if (raw.version !== 1 && raw.version !== 2)
+  if (
+    raw.version !== 1 &&
+    raw.version !== 2 &&
+    raw.version !== 3 &&
+    raw.version !== 4
+  )
     throw new Error(
-      "Phiên bản dữ liệu không được hỗ trợ. Hỗ trợ phiên bản 1 và 2.",
+      "Phiên bản dữ liệu không được hỗ trợ. Hỗ trợ phiên bản 1, 2, 3 và 4.",
     );
   // Version 1 uses the same entities, but did not have workspace settings.
   const d = structuredClone({
     ...raw,
-    version: 2,
+    version: 4,
+    wageCalculations: raw.version === 4 ? raw.wageCalculations : [],
     settings:
       raw.version === 1
         ? {
@@ -178,13 +185,15 @@ export function migrate(raw: unknown): AppData {
         typeof e.archived === "boolean" &&
         text(e.notes) &&
         Array.isArray(e.rates) &&
-        e.rates.length > 0,
+        (raw.version === 3 || raw.version === 4 || e.rates.length > 0),
     );
     check(
       e.rates.every(
         (r) => record(r) && validDate(r.effectiveFrom) && cash(r.amount),
       ) &&
-        e.rates.some((r) => r.effectiveFrom <= e.startDate) &&
+        (raw.version === 3 ||
+          raw.version === 4 ||
+          e.rates.some((r) => r.effectiveFrom <= e.startDate)) &&
         new Set(e.rates.map((r) => r.effectiveFrom)).size === e.rates.length,
     );
   }
@@ -193,7 +202,7 @@ export function migrate(raw: unknown): AppData {
   for (const [month, rows] of Object.entries(d.attendance)) {
     check(validMonth(month) && Array.isArray(rows));
     for (const s of rows) {
-      validateShift(s, d.employees);
+      validateShift(s, d.employees, raw.version === 1 || raw.version === 2);
       check(s.date.startsWith(month) && !shiftIds.has(s.id));
       shiftIds.add(s.id);
       assertNoOverlap(s, all);
@@ -225,7 +234,7 @@ export function migrate(raw: unknown): AppData {
           ),
       );
       for (const s of p.shifts) {
-        validateShift(s, d.employees);
+        validateShift(s, d.employees, true);
         check(s.employeeId === p.employeeId && s.date.startsWith(month));
       }
       check(
@@ -249,7 +258,7 @@ export function migrate(raw: unknown): AppData {
           ? text(p.paidAt) && Number.isFinite(Date.parse(p.paidAt!))
           : p.paidAt === null,
       );
-      if (p.confirmed) {
+      if (p.confirmed && (raw.version === 1 || raw.version === 2)) {
         const actual = all.filter(
           (s) => s.employeeId === p.employeeId && s.date.startsWith(month),
         );
@@ -267,8 +276,54 @@ export function migrate(raw: unknown): AppData {
       }
     }
   }
-  // Drafts are derived from the current shifts; confirmed snapshots remain immutable.
-  return refreshDrafts(d);
+  check(Array.isArray(d.wageCalculations));
+  const calculationIds = new Set<string>(),
+    calculatedIds = new Set<string>();
+  for (const r of d.wageCalculations) {
+    check(
+      record(r) &&
+        text(r.id) &&
+        r.id.length > 0 &&
+        !calculationIds.has(r.id) &&
+        d.employees.some((e) => e.id === r.employeeId) &&
+        text(r.employeeName) &&
+        text(r.employeeCode),
+    );
+    calculationIds.add(r.id);
+    check(
+      validDate(r.startDate) &&
+        validDate(r.endDate) &&
+        r.startDate <= r.endDate &&
+        text(r.notes) &&
+        text(r.calculatedAt) &&
+        Number.isFinite(Date.parse(r.calculatedAt)) &&
+        Array.isArray(r.shifts) &&
+        r.shifts.length > 0,
+    );
+    check(
+      cash(r.minutes) &&
+        r.minutes > 0 &&
+        cash(r.hourlyRate) &&
+        r.hourlyRate > 0 &&
+        cash(r.amount) &&
+        r.amount === salary(r.minutes, r.hourlyRate),
+    );
+    for (const s of r.shifts) {
+      validateShift(s, d.employees);
+      check(
+        s.employeeId === r.employeeId &&
+          s.date >= r.startDate &&
+          s.date <= r.endDate &&
+          !calculatedIds.has(s.id),
+      );
+      calculatedIds.add(s.id);
+      const original = all.find((t) => t.id === s.id);
+      check(original && shiftSignature([original]) === shiftSignature([s]));
+    }
+    check(r.minutes === sum(r.shifts, (s) => s.actualMinutes));
+  }
+  // Financial records from v1/v2 remain independent archives; new calculations use shift snapshots.
+  return d;
 }
 export function serialize(data: AppData) {
   return JSON.stringify(data, null, 2);
@@ -277,10 +332,26 @@ export function restore(content: string) {
   return migrate(JSON.parse(content));
 }
 export function monthBackup(data: AppData, month: string): AppData {
+  const calculations = data.wageCalculations.filter((r) =>
+    r.shifts.some((s) => s.date.startsWith(month)),
+  );
+  const requiredIds = new Set(
+    calculations.flatMap((r) => r.shifts.map((s) => s.id)),
+  );
+  const attendance: AppData["attendance"] = { [month]: [] };
+  for (const s of Object.values(data.attendance).flat()) {
+    if (s.date.startsWith(month) || requiredIds.has(s.id)) {
+      const key = s.date.slice(0, 7);
+      attendance[key] ??= [];
+      attendance[key].push(s);
+    }
+  }
   return {
     ...data,
-    attendance: { [month]: data.attendance[month] ?? [] },
+    attendance,
     payroll: { [month]: data.payroll[month] ?? [] },
+    // Keep complete calculations and every source shift they reference, including cross-month weeks.
+    wageCalculations: calculations,
   };
 }
 export function savePayroll(data: AppData, row: Payroll): AppData {

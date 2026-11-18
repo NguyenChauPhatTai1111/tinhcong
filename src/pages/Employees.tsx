@@ -23,8 +23,8 @@ import {
   PageHeading,
   Submit,
 } from "../components/common/UI";
-import { dateLabel, hours, money, today } from "../utils/format";
-import { rateAt, refreshDrafts, sum } from "../utils/salaryCalculator";
+import { dateLabel, hours, today } from "../utils/format";
+import { sum } from "../utils/salaryCalculator";
 import { validDate } from "../utils/timeCalculator";
 export function EmployeeForm({
   employee,
@@ -41,28 +41,12 @@ export function EmployeeForm({
     );
   const [phone, setPhone] = useState(employee?.phone ?? ""),
     [start, setStart] = useState(employee?.startDate ?? today());
-  const [rate, setRate] = useState(
-      employee ? rateAt(employee, today()) : 30000,
-    ),
-    [changeRate, setChangeRate] = useState(false),
-    [effective, setEffective] = useState(today());
   const [active, setActive] = useState(employee?.active ?? true),
     [notes, setNotes] = useState(employee?.notes ?? "");
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (
-      !name.trim() ||
-      !code.trim() ||
-      !validDate(start) ||
-      !Number.isSafeInteger(rate) ||
-      rate < 0 ||
-      ((changeRate || !employee) &&
-        (!validDate(effective) || (employee && effective < start)))
-    )
-      return toast(
-        "Kiểm tra tên, mã, ngày và mức lương nguyên không âm.",
-        true,
-      );
+    if (!name.trim() || !code.trim() || !validDate(start))
+      return toast("Kiểm tra tên, mã và ngày bắt đầu làm việc.", true);
     if (
       data.employees.some(
         (p) =>
@@ -76,14 +60,6 @@ export function EmployeeForm({
       .filter((s) => s.employeeId === employee?.id);
     if (shifts.some((s) => s.date < start))
       return toast("Ngày bắt đầu không được sau ngày đã chấm công.", true);
-    let rates = employee?.rates ?? [{ effectiveFrom: start, amount: rate }];
-    if (employee && changeRate)
-      rates = [
-        ...rates.filter((r) => r.effectiveFrom !== effective),
-        { effectiveFrom: effective, amount: rate },
-      ];
-    if (employee && !rates.some((r) => r.effectiveFrom <= start))
-      rates = [{ effectiveFrom: start, amount: rates[0].amount }, ...rates];
     const row: Employee = {
       id: employee?.id ?? crypto.randomUUID(),
       name: name.trim(),
@@ -93,7 +69,7 @@ export function EmployeeForm({
       active,
       archived: employee?.archived ?? false,
       notes: notes.trim(),
-      rates,
+      rates: employee?.rates ?? [],
     };
     if (
       await mutate(
@@ -101,7 +77,7 @@ export function EmployeeForm({
           d.employees = employee
             ? d.employees.map((p) => (p.id === row.id ? row : p))
             : [...d.employees, row];
-          return refreshDrafts(d);
+          return d;
         },
         employee ? "Đã cập nhật nhân viên." : "Đã thêm nhân viên.",
       )
@@ -160,46 +136,6 @@ export function EmployeeForm({
               <option value="inactive">Đã nghỉ việc</option>
             </select>
           </Field>
-          {employee && (
-            <label className="check-field full">
-              <input
-                type="checkbox"
-                checked={changeRate}
-                onChange={(e) => setChangeRate(e.target.checked)}
-              />{" "}
-              Thiết lập mức lương mới từ ngày có hiệu lực
-            </label>
-          )}
-          {(!employee || changeRate) && (
-            <>
-              <Field label="Lương theo giờ (đ) *">
-                <input
-                  type="number"
-                  min="0"
-                  max="1000000000"
-                  step="1"
-                  required
-                  value={rate}
-                  onChange={(e) => setRate(e.target.valueAsNumber)}
-                />
-              </Field>
-              {employee && (
-                <Field label="Ngày có hiệu lực *">
-                  <input
-                    type="date"
-                    required
-                    min={start}
-                    value={effective}
-                    onChange={(e) => setEffective(e.target.value)}
-                  />
-                </Field>
-              )}
-              <p className="info-note full">
-                Mức lương áp dụng khi tạo ca theo ngày làm việc. Các ca đã lưu
-                giữ nguyên đơn giá, kể cả khi chỉnh sửa giờ.
-              </p>
-            </>
-          )}
           <Field label="Ghi chú" className="full">
             <textarea
               rows={3}
@@ -257,7 +193,7 @@ export default function Employees() {
     <>
       <PageHeading
         title="Quản lý nhân viên"
-        description="Một nơi để quản lý đội ngũ và thông tin lương của bạn."
+        description="Quản lý người làm và theo dõi giờ công của từng nhân viên."
       >
         <Button className="primary" onClick={() => setForm("new")}>
           <Plus size={18} /> Thêm nhân viên
@@ -318,7 +254,6 @@ export default function Employees() {
                 <tr>
                   <th>Nhân viên</th>
                   <th>Liên hệ</th>
-                  <th>Lương theo giờ</th>
                   <th>Ngày bắt đầu</th>
                   <th>Trạng thái</th>
                   <th aria-label="Thao tác" />
@@ -337,10 +272,6 @@ export default function Employees() {
                       </div>
                     </td>
                     <td data-label="Liên hệ">{e.phone || "—"}</td>
-                    <td data-label="Lương theo giờ" className="semibold">
-                      {money(rateAt(e, today()))}
-                      <small className="muted inline"> / giờ</small>
-                    </td>
                     <td data-label="Ngày bắt đầu">{dateLabel(e.startDate)}</td>
                     <td data-label="Trạng thái">
                       <button
@@ -395,7 +326,7 @@ export default function Employees() {
                 ? "Không tìm thấy nhân viên"
                 : "Bắt đầu với nhân viên đầu tiên"
             }
-            description="Thêm nhân viên và thiết lập mức lương theo giờ để bắt đầu chấm công."
+            description="Thêm tên nhân viên để bắt đầu ghi nhận giờ công."
             action={
               <Button className="primary" onClick={() => setForm("new")}>
                 <Plus size={17} /> Thêm nhân viên
@@ -411,7 +342,7 @@ export default function Employees() {
       {data.employees.some((e) => e.archived) && (
         <section className="card archive-section">
           <h3>Nhân viên đã lưu trữ</h3>
-          <p className="muted">Hồ sơ và lịch sử lương vẫn được bảo toàn.</p>
+          <p className="muted">Hồ sơ và lịch sử giờ công vẫn được bảo toàn.</p>
           {data.employees
             .filter((e) => e.archived)
             .map((e) => (
@@ -464,8 +395,8 @@ export default function Employees() {
           }}
         >
           Nhân viên {archive.name} sẽ ngừng xuất hiện trong danh sách chấm công
-          mới. Toàn bộ dữ liệu chấm công và bảng lương liên quan được giữ lại.
-          Bạn có thể khôi phục hồ sơ sau.
+          mới. Toàn bộ dữ liệu chấm công liên quan được giữ lại. Bạn có thể khôi
+          phục hồ sơ sau.
         </Confirm>
       )}
       {detail && (
@@ -505,17 +436,6 @@ export default function Employees() {
                 </dd>
               </div>
             </dl>
-            <h3>Lịch sử đơn giá</h3>
-            <div className="rate-history">
-              {[...detail.rates]
-                .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))
-                .map((r) => (
-                  <div key={r.effectiveFrom}>
-                    <span>Từ {dateLabel(r.effectiveFrom)}</span>
-                    <strong>{money(r.amount)} / giờ</strong>
-                  </div>
-                ))}
-            </div>
             {detail.notes && <p className="info-note">{detail.notes}</p>}
           </div>
           <footer>

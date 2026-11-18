@@ -148,13 +148,11 @@ test("Đổi thông tin đăng nhập mã hóa lại dữ liệu; bản sao lưu
   await expect(page.locator(".auth-card>.alert.error")).toBeVisible();
   await signIn(page, "quantri", "Mat-khau-moi-CongViet-2026!");
   await page.goto("/#/cai-dat");
-  await page
-    .getByLabel("Chọn file sao lưu", { exact: true })
-    .setInputFiles({
-      name: "backup-cu.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(oldBackup!),
-    });
+  await page.getByLabel("Chọn file sao lưu", { exact: true }).setInputFiles({
+    name: "backup-cu.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(oldBackup!),
+  });
   await page
     .getByLabel("Mật khẩu bản sao lưu", { exact: true })
     .fill(ADMIN_PASSWORD);
