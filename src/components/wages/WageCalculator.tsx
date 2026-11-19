@@ -4,6 +4,8 @@ import { useApp } from "../../contexts/AppContext";
 import { Badge, Button, Field, Modal, Submit } from "../common/UI";
 import { dateLabel, download, duration, money } from "../../utils/format";
 import { salary } from "../../utils/salaryCalculator";
+import { pendingAdvances } from "../../services/advances";
+import { AdvanceForm } from "../attendance/AdvanceForm";
 import {
   csvContent,
   shiftsInRange,
@@ -33,6 +35,7 @@ export function WageCalculator({
   const { data, mutate, saving } = useApp();
   const [rateText, setRateText] = useState(""),
     [notes, setNotes] = useState("");
+  const [addingAdvance, setAddingAdvance] = useState(false);
   const employee = data.employees.find((e) => e.id === target.employeeId)!;
   const shifts = pendingShifts(data, target.employeeId, target.range),
     minutes = totalMinutes(shifts);
@@ -42,6 +45,8 @@ export function WageCalculator({
     ),
   );
   const records = calculationsInRange(data, target.employeeId, target.range);
+  const advances = pendingAdvances(data, target.employeeId, target.range);
+  const advanceTotal = advances.reduce((total, a) => total + a.amount, 0);
   const rate = rateText.trim() ? Number(rateText) : NaN,
     amount = salary(minutes, rate);
   const validAmount =
@@ -83,6 +88,8 @@ export function WageCalculator({
           "Số giờ",
           "Đơn giá (đ/giờ)",
           "Tiền lương (đ)",
+          "Tiền đã ứng (đ)",
+          "Thực nhận (đ)",
           "Ngày tính",
           "Ghi chú",
         ],
@@ -95,6 +102,8 @@ export function WageCalculator({
           r.minutes / 60,
           r.hourlyRate,
           r.amount,
+          r.advanceTotal ?? 0,
+          r.netAmount ?? r.amount,
           dateLabel(r.calculatedAt, "HH:mm dd/MM/yyyy"),
           r.notes,
         ]),
@@ -151,17 +160,30 @@ export function WageCalculator({
                 placeholder="VD: 30000"
               />
             </Field>
+            <section className="full">
+              <div className="section-heading">
+                <h3>Ứng lương trong kỳ · {money(advanceTotal)}</h3>
+                <Button disabled={saving || !employee.active || employee.archived} onClick={() => setAddingAdvance(true)}>Ghi nhận ứng lương</Button>
+              </div>
+              {advances.length ? advances.map((a) => <p className="info-note" key={a.id}>
+                {dateLabel(a.date)} · {money(a.amount)}{a.notes && ` · ${a.notes}`}
+              </p>) : <p className="hint">Chưa có khoản ứng chưa trừ trong kỳ này.</p>}
+            </section>
             <div className="payroll-total full">
               <div>
-                <span>TIỀN LƯƠNG LẦN NÀY</span>
+                <span>TIỀN THỰC NHẬN LẦN NÀY</span>
                 <p>
                   {duration(minutes)} × đơn giá theo giờ · Làm tròn đến đồng
+                  <br />Lương trước ứng: {validAmount ? money(amount) : "—"} · Trừ ứng: {money(advanceTotal)}
                 </p>
               </div>
               <strong aria-live="polite">
-                {validAmount ? money(amount) : "—"}
+                {validAmount ? money(amount - advanceTotal) : "—"}
               </strong>
             </div>
+            {validAmount && advanceTotal > amount && <p className="alert warning full">
+              Tiền ứng vượt lương {money(advanceTotal - amount)}. Kết quả sẽ ghi nhận số dư âm; không tự chuyển khoản vượt sang kỳ sau.
+            </p>}
             <Field label="Ghi chú tính lương" className="full">
               <textarea
                 rows={2}
@@ -240,7 +262,12 @@ export function WageCalculator({
                       <dt>Tiền lương</dt>
                       <dd className="text-blue">{money(r.amount)}</dd>
                     </div>
+                    <div><dt>Đã ứng</dt><dd>{money(r.advanceTotal ?? 0)}</dd></div>
+                    <div><dt>Thực nhận</dt><dd className="text-blue">{money(r.netAmount ?? r.amount)}</dd></div>
                   </dl>
+                  {(r.advances ?? []).map((a) => <p className="info-note" key={a.id}>
+                    Ứng ngày {dateLabel(a.date)} · {money(a.amount)}{a.notes && ` · ${a.notes}`}
+                  </p>)}
                   {r.notes && <p className="info-note">{r.notes}</p>}
                   <div className="table-wrap">
                     <table className="compact-table">
@@ -284,6 +311,8 @@ export function WageCalculator({
           </footer>
         </>
       )}
+      {addingAdvance && <AdvanceForm employeeId={employee.id} initialDate={target.range.end}
+        onClose={() => setAddingAdvance(false)} />}
     </Modal>
   );
 }

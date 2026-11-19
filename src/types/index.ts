@@ -54,7 +54,15 @@ export interface AppData {
   attendance: Record<string, Attendance[]>;
   payroll: Record<string, Payroll[]>;
   wageCalculations: WageCalculation[];
+  salaryAdvances?: SalaryAdvance[];
   settings: { theme: "light" | "dark"; company: string };
+}
+export interface SalaryAdvance {
+  id: string;
+  employeeId: string;
+  date: string;
+  amount: number;
+  notes: string;
 }
 export interface WageCalculation {
   id: string;
@@ -67,6 +75,9 @@ export interface WageCalculation {
   minutes: number;
   hourlyRate: number;
   amount: number;
+  advances?: SalaryAdvance[];
+  advanceTotal?: number;
+  netAmount?: number;
   notes: string;
   calculatedAt: string;
 }

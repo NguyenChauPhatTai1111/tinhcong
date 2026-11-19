@@ -10,7 +10,7 @@ import {
   LockKeyhole,
   X,
 } from "lucide-react";
-import type { Attendance as Shift } from "../types";
+import type { Attendance as Shift, SalaryAdvance } from "../types";
 import { useApp } from "../contexts/AppContext";
 import {
   Avatar,
@@ -19,21 +19,37 @@ import {
   Empty,
   MonthPicker,
   PageHeading,
+  Modal,
 } from "../components/common/UI";
 import { AttendanceForm } from "../components/attendance/AttendanceForm";
-import { dateLabel, hours, duration, monthDays, today } from "../utils/format";
+import { AdvanceForm } from "../components/attendance/AdvanceForm";
+import { deductedAdvanceIds, removeAdvance } from "../services/advances";
+import { dateLabel, hours, duration, monthDays, today, money } from "../utils/format";
 import { lunchLabel, presenceMinutes } from "../utils/timeSummary";
 import { sum } from "../utils/salaryCalculator";
 import { removeAttendance } from "../services/storage";
 import { calculatedShiftIds } from "../services/wages";
 export default function Attendance() {
-  const { data, month, mutate } = useApp(),
+  const { data, month, mutate, saving } = useApp(),
     [employee, setEmployee] = useState("all"),
     [date, setDate] = useState(""),
     [search, setSearch] = useState(""),
     [view, setView] = useState("list");
   const [form, setForm] = useState<Shift | "new" | null>(null),
     [deleting, setDeleting] = useState<Shift | null>(null);
+  const [detail, setDetail] = useState<string | null>(null);
+  const [advanceForm, setAdvanceForm] = useState<SalaryAdvance | "new" | null>(null);
+  const [deletingAdvance, setDeletingAdvance] = useState<SalaryAdvance | null>(null);
+  const deductedIds = deductedAdvanceIds(data);
+  const monthAdvances = (data.salaryAdvances ?? []).filter((a) => a.date.startsWith(month));
+  const employees = data.employees.filter((e) =>
+    (!e.archived || rowsForEmployee(e.id)) && (employee === "all" || employee === e.id) &&
+    (!search || `${e.name} ${e.code}`.toLowerCase().includes(search.toLowerCase()) ||
+      (data.attendance[month] ?? []).some((s) => s.employeeId === e.id && s.notes.toLowerCase().includes(search.toLowerCase()))));
+  function rowsForEmployee(id: string) {
+    return (data.attendance[month] ?? []).some((s) => s.employeeId === id) || monthAdvances.some((a) => a.employeeId === id);
+  }
+  const selectedEmployee = data.employees.find((e) => e.id === detail);
   const calculatedIds = calculatedShiftIds(data);
   const filtered = (data.attendance[month] ?? []).filter((s) => {
     const e = data.employees.find((e) => e.id === s.employeeId);
@@ -161,6 +177,7 @@ export default function Attendance() {
         description="Ghi nhận từng ca làm, tính đúng từng giờ công."
       >
         <MonthPicker />
+        <Button onClick={() => setAdvanceForm("new")} disabled={saving}>Ghi nhận ứng lương</Button>
         <Button className="primary" onClick={openNew}>
           <Plus size={18} /> Chấm công mới
         </Button>
@@ -195,7 +212,7 @@ export default function Attendance() {
         <div className="section-heading">
           <div>
             <h2>Bảng chấm công</h2>
-            <p>Lọc và quản lý các ca làm trong tháng.</p>
+            <p>Bấm vào nhân viên để xem ngày đã chấm công và các khoản ứng lương.</p>
           </div>
           <div className="segmented">
             <button
@@ -253,7 +270,23 @@ export default function Attendance() {
           )}
         </div>
         {view === "list" ? (
-          table(rows)
+          employees.length ? <div className="table-wrap"><table className="responsive-table">
+            <thead><tr><th>Nhân viên</th><th>Ngày đã chấm</th><th>Số ca</th><th>Tổng giờ thực tế</th><th>Đã ứng trong tháng</th><th /></tr></thead>
+            <tbody>{employees.map((e, i) => {
+              const shifts = rows.filter((s) => s.employeeId === e.id);
+              const advances = monthAdvances.filter((a) => a.employeeId === e.id);
+              return <tr key={e.id}>
+                <td data-label="Nhân viên"><button className="text-link" onClick={() => setDetail(e.id)}>
+                  <Avatar name={e.name} index={i} /><span>{e.name}<small className="muted">{e.code}</small></span>
+                </button></td>
+                <td data-label="Ngày đã chấm">{new Set(shifts.map((s) => s.date)).size} ngày</td>
+                <td data-label="Số ca">{shifts.length}</td>
+                <td data-label="Tổng giờ thực tế">{duration(sum(shifts, (s) => s.actualMinutes))}</td>
+                <td data-label="Đã ứng trong tháng">{money(sum(advances, (a) => a.amount))}</td>
+                <td className="actions"><Button onClick={() => setDetail(e.id)}>Xem chấm công</Button></td>
+              </tr>;
+            })}</tbody>
+          </table></div> : <Empty title="Chưa có nhân viên phù hợp" description="Thêm nhân viên hoặc thay đổi bộ lọc để xem chấm công." />
         ) : (
           <>
             <div className="calendar">
@@ -317,10 +350,36 @@ export default function Attendance() {
           <strong>{duration(sum(rows, (s) => s.actualMinutes))}</strong>
         </div>
       </section>
+      {selectedEmployee && <Modal title={`Chấm công · ${selectedEmployee.name}`} subtitle={`${selectedEmployee.code} · Tháng ${month.slice(5)}/${month.slice(0, 4)}`} wide onClose={() => setDetail(null)}>
+        <div className="modal-body">
+          <div className="section-heading"><div><h3>Các ngày đã chấm công</h3>
+            <p>{activeDate ? `Đang lọc ngày ${dateLabel(activeDate)}` : "Các ca làm trong tháng đang chọn."}</p></div>
+            <Button className="primary" onClick={openNew}>Thêm ca làm</Button></div>
+          {table(rows.filter((s) => s.employeeId === detail))}
+          <div className="section-heading"><h3>Ứng lương trong tháng</h3>
+            <Button disabled={saving || !selectedEmployee.active || selectedEmployee.archived} onClick={() => setAdvanceForm("new")}>Ghi nhận ứng lương</Button></div>
+          {monthAdvances.some((a) => a.employeeId === detail) ? <div className="table-wrap"><table className="responsive-table">
+            <thead><tr><th>Ngày ứng</th><th>Số tiền</th><th>Ghi chú</th><th>Trạng thái</th><th /></tr></thead>
+            <tbody>{monthAdvances.filter((a) => a.employeeId === detail).sort((a, b) => b.date.localeCompare(a.date)).map((a) =>
+              <tr key={a.id}><td data-label="Ngày ứng">{dateLabel(a.date)}</td><td data-label="Số tiền">{money(a.amount)}</td>
+                <td data-label="Ghi chú">{a.notes || "—"}</td><td data-label="Trạng thái">{deductedIds.has(a.id) ? "Đã trừ vào lương" : "Chưa trừ vào lương"}</td>
+                <td className="actions"><button className="icon-btn" aria-label={`Sửa khoản ứng ${a.date}`} disabled={saving || deductedIds.has(a.id)} onClick={() => setAdvanceForm(a)}><Pencil size={16} /></button>
+                <button className="icon-btn red" aria-label={`Xóa khoản ứng ${a.date}`} disabled={saving || deductedIds.has(a.id)} onClick={() => setDeletingAdvance(a)}><Trash2 size={16} /></button></td></tr>)}</tbody>
+          </table></div> : <p className="info-note">Chưa có khoản ứng trong tháng này.</p>}
+        </div>
+        <footer><Button onClick={() => setDetail(null)}>Đóng</Button></footer>
+      </Modal>}
+      {advanceForm && <AdvanceForm employeeId={detail ?? undefined} initialDate={selectedDate}
+        row={advanceForm === "new" ? undefined : advanceForm} onClose={() => setAdvanceForm(null)} />}
+      {deletingAdvance && <Confirm title="Xóa khoản ứng lương?" danger label="Xóa khoản ứng" onClose={() => setDeletingAdvance(null)}
+        onConfirm={async () => { if (await mutate((d) => removeAdvance(d, deletingAdvance.id), "Đã xóa khoản ứng lương.")) setDeletingAdvance(null); }}>
+        Xóa khoản ứng {money(deletingAdvance.amount)} ngày {dateLabel(deletingAdvance.date)}?
+      </Confirm>}
       {form && (
         <AttendanceForm
           row={form === "new" ? undefined : form}
           initialDate={selectedDate}
+          initialEmployeeId={detail ?? undefined}
           onClose={() => setForm(null)}
         />
       )}{" "}

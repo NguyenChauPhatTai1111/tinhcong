@@ -12,15 +12,17 @@ import { MonthlyPayrollNotice } from "../common/MonthlyPayrollNotice";
 export function AttendanceForm({
   row,
   initialDate,
+  initialEmployeeId,
   onClose,
 }: {
   row?: Attendance;
   initialDate?: string;
+  initialEmployeeId?: string;
   onClose: () => void;
 }) {
   const { data, mutate, toast } = useApp();
   const [date, setDate] = useState(row?.date ?? initialDate ?? today()),
-    [employeeId, setEmployeeId] = useState(row?.employeeId ?? "");
+    [employeeId, setEmployeeId] = useState(row?.employeeId ?? initialEmployeeId ?? "");
   const [startTime, setStartTime] = useState(
       row ? dateLabel(row.start, "HH:mm") : "08:00",
     ),

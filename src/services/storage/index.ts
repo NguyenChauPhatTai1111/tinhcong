@@ -16,6 +16,7 @@ export function emptyData(): AppData {
     attendance: {},
     payroll: {},
     wageCalculations: [],
+    salaryAdvances: [],
     settings: { theme: "light", company: "Không gian làm việc" },
   };
 }
@@ -145,6 +146,7 @@ export function migrate(raw: unknown): AppData {
     ...raw,
     version: 4,
     wageCalculations: raw.version === 4 ? raw.wageCalculations : [],
+    salaryAdvances: raw.salaryAdvances === undefined ? [] : raw.salaryAdvances,
     settings:
       raw.version === 1
         ? {
@@ -276,6 +278,15 @@ export function migrate(raw: unknown): AppData {
       }
     }
   }
+  check(Array.isArray(d.salaryAdvances));
+  const advanceIds = new Set<string>();
+  for (const a of d.salaryAdvances!) {
+    check(record(a) && text(a.id) && !!a.id && !advanceIds.has(a.id) &&
+      d.employees.some((e) => e.id === a.employeeId && a.date >= e.startDate) &&
+      validDate(a.date) && cash(a.amount) && a.amount > 0 && text(a.notes));
+    advanceIds.add(a.id);
+  }
+  const deductedIds = new Set<string>();
   check(Array.isArray(d.wageCalculations));
   const calculationIds = new Set<string>(),
     calculatedIds = new Set<string>();
@@ -321,6 +332,19 @@ export function migrate(raw: unknown): AppData {
       check(original && shiftSignature([original]) === shiftSignature([s]));
     }
     check(r.minutes === sum(r.shifts, (s) => s.actualMinutes));
+    if (r.advances !== undefined || r.advanceTotal !== undefined || r.netAmount !== undefined) {
+      check(Array.isArray(r.advances) && cash(r.advanceTotal) &&
+        Number.isSafeInteger(r.netAmount) && r.netAmount === r.amount - r.advanceTotal!);
+      for (const a of r.advances!) {
+        check(record(a) && !deductedIds.has(a.id) && a.employeeId === r.employeeId &&
+          a.date >= r.startDate && a.date <= r.endDate);
+        const original = d.salaryAdvances!.find((t) => t.id === a.id);
+        check(original && original.employeeId === a.employeeId && original.date === a.date &&
+          original.amount === a.amount && original.notes === a.notes);
+        deductedIds.add(a.id);
+      }
+      check(r.advanceTotal === sum(r.advances!, (a) => a.amount));
+    }
   }
   // Financial records from v1/v2 remain independent archives; new calculations use shift snapshots.
   return d;
@@ -352,6 +376,8 @@ export function monthBackup(data: AppData, month: string): AppData {
     payroll: { [month]: data.payroll[month] ?? [] },
     // Keep complete calculations and every source shift they reference, including cross-month weeks.
     wageCalculations: calculations,
+    salaryAdvances: (data.salaryAdvances ?? []).filter((a) => a.date.startsWith(month) ||
+      calculations.some((r) => r.advances?.some((t) => t.id === a.id))),
   };
 }
 export function savePayroll(data: AppData, row: Payroll): AppData {

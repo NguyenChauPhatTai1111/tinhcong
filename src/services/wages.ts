@@ -6,6 +6,7 @@ import {
 } from "../utils/timeSummary";
 import { validDate } from "../utils/timeCalculator";
 import { salary } from "../utils/salaryCalculator";
+import { pendingAdvances } from "./advances";
 
 export function calculatedShiftIds(data: AppData): Set<string> {
   return new Set(
@@ -86,6 +87,9 @@ export function finalizeWages(
   const amount = salary(minutes, hourlyRate);
   if (!Number.isSafeInteger(amount) || amount < 0)
     throw new Error("Số tiền vượt giới hạn cho phép.");
+  const advances = pendingAdvances(data, employeeId, range);
+  const advanceTotal = advances.reduce((total, a) => total + a.amount, 0);
+  if (!Number.isSafeInteger(advanceTotal)) throw new Error("Tổng tiền ứng vượt giới hạn cho phép.");
   const record: WageCalculation = {
     id: crypto.randomUUID(),
     employeeId,
@@ -97,6 +101,9 @@ export function finalizeWages(
     minutes,
     hourlyRate,
     amount,
+    advances: structuredClone(advances),
+    advanceTotal,
+    netAmount: amount - advanceTotal,
     notes: notes.trim(),
     calculatedAt: new Date().toISOString(),
   };

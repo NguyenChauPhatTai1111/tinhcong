@@ -69,11 +69,15 @@ test("Giờ công theo hội thoại: nghỉ linh hoạt, tuần/tháng/khoảng
   await page.getByLabel("Chọn tháng và năm").fill("2026-11");
   await addShift(page, "2026-11-16", "04:00", "08:00", "0,5");
   await expect(page.locator("tbody")).toContainText("3 giờ 30 phút");
-  await expect(page.locator("tbody")).toContainText("Có nghỉ trưa");
+  await page.getByRole("button", { name: "Xem chấm công" }).click();
+  await expect(page.locator("dialog tbody")).toContainText("Có nghỉ trưa");
+  await page.getByRole("button", { name: "Đóng", exact: true }).last().click();
   await addShift(page, "2026-11-17", "04:00", "09:00");
   await addShift(page, "2026-11-18", "20:00", "06:00", "1.5");
-  await expect(page.locator("tbody")).toContainText("8 giờ 30 phút");
-  await expect(page.locator("tbody")).toContainText("Không nghỉ trưa");
+  await page.getByRole("button", { name: "Xem chấm công" }).click();
+  await expect(page.locator("dialog tbody")).toContainText("8 giờ 30 phút");
+  await expect(page.locator("dialog tbody")).toContainText("Không nghỉ trưa");
+  await page.getByRole("button", { name: "Đóng", exact: true }).last().click();
   await page.getByRole("button", { name: "Xem lịch" }).click();
   await expect(
     page.locator(".calendar-day").filter({ hasText: "1 ca làm" }),
@@ -99,6 +103,7 @@ test("Giờ công theo hội thoại: nghỉ linh hoạt, tuần/tháng/khoảng
   );
   await page.getByRole("button", { name: "Đóng", exact: true }).click();
   await page.goto("/#/cham-cong");
+  await page.getByRole("button", { name: "Xem chấm công" }).click();
   await page
     .getByRole("button", {
       name: "Sửa ca Nguyễn Văn Huy 2026-11-16",
@@ -111,7 +116,7 @@ test("Giờ công theo hội thoại: nghỉ linh hoạt, tuần/tháng/khoảng
   await page
     .getByRole("button", { name: "Lưu chấm công", exact: true })
     .click();
-  await expect(page.locator("dialog")).toHaveCount(0);
+  await expect(page.locator("dialog")).toHaveCount(1);
   await page
     .getByRole("button", {
       name: "Xóa ca Nguyễn Văn Huy 2026-11-17",
@@ -119,7 +124,7 @@ test("Giờ công theo hội thoại: nghỉ linh hoạt, tuần/tháng/khoảng
     })
     .click();
   await page.getByRole("button", { name: "Xóa ca làm", exact: true }).click();
-  await expect(page.locator("dialog")).toHaveCount(0);
+  await expect(page.locator("dialog")).toHaveCount(1);
   await page.goto("/#/tong-hop");
   await expect(page.getByTestId("summary-worked")).toHaveText("13 giờ");
   await page.reload();

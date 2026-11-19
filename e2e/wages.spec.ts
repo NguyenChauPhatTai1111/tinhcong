@@ -121,12 +121,14 @@ test("Nút tính lương từng người: xác nhận, khóa sau khi lưu, khôn
     mai.getByRole("button", { name: "Đã tính lương", exact: true }),
   ).toBeDisabled();
   await page.goto("/#/cham-cong");
+  await page.locator("tbody>tr").filter({ hasText: "Nguyễn Văn Huy" }).getByRole("button", { name: "Xem chấm công" }).click();
   await expect(
     page.getByRole("button", {
       name: "Sửa ca Nguyễn Văn Huy 2026-11-16",
       exact: true,
     }),
   ).toBeDisabled();
+  await page.getByRole("button", { name: "Đóng", exact: true }).last().click();
   await addShift("Nguyễn Văn Huy · NV001", "2026-11-17");
   await page.goto("/#/tong-hop");
   await huy.getByRole("button", { name: "Tính lương", exact: true }).click();

@@ -16,6 +16,7 @@ import {
   shiftSignature,
 } from "../services/wages";
 import { localISO } from "../utils/timeCalculator";
+import { pendingAdvances, saveAdvance, removeAdvance } from "../services/advances";
 const employee: Employee = {
   id: "employee-1",
   code: "NV001",
@@ -57,6 +58,60 @@ function fixture(): AppData {
   );
 }
 describe("Tính lương từng nhân viên và đánh dấu đã tính", () => {
+  const advance = (amount = 30000, date = "2026-11-16", employeeId = employee.id) => ({
+    id: crypto.randomUUID(), employeeId, date, amount, notes: "Ứng sinh hoạt",
+  });
+  it("trừ nhiều khoản ứng đúng người, đúng kỳ và giữ nguyên giờ công", () => {
+    let data = saveAdvance(fixture(), advance());
+    data = saveAdvance(data, advance(20000));
+    data = saveAdvance(data, advance(10000, "2026-12-01"));
+    data = saveAdvance(data, advance(15000, "2026-11-16", "employee-2"));
+    const next = finalizeWages(data, employee.id, range, 30000, "");
+    expect(next.wageCalculations[0]).toMatchObject({ minutes: 210, amount: 105000, advanceTotal: 50000, netAmount: 55000 });
+    expect(next.wageCalculations[0].advances).toHaveLength(2);
+    expect(restore(serialize(next))).toEqual(next);
+  });
+  it("không trừ ứng lần hai khi thêm ca mới hoặc đổi kỳ lọc", () => {
+    let data = finalizeWages(saveAdvance(fixture(), advance()), employee.id, range, 30000, "");
+    data = saveAttendance(data, shift("2026-11-17"));
+    expect(pendingAdvances(data, employee.id, range)).toHaveLength(0);
+    data = finalizeWages(data, employee.id, { start: "2026-11-16", end: "2026-11-22" }, 30000, "");
+    expect(data.wageCalculations[1]).toMatchObject({ advanceTotal: 0, netAmount: 105000 });
+  });
+  it("sửa/xóa ứng chưa trừ; khóa khoản đã trừ và phát hiện backup bị sửa", () => {
+    const row = advance();
+    let data = saveAdvance(fixture(), row);
+    expect(saveAdvance(data, { ...row, amount: 40000 }).salaryAdvances![0].amount).toBe(40000);
+    expect(removeAdvance(data, row.id).salaryAdvances).toEqual([]);
+    data = finalizeWages(data, employee.id, range, 30000, "");
+    expect(() => saveAdvance(data, { ...row, amount: 40000 })).toThrow("đã trừ");
+    expect(() => removeAdvance(data, row.id)).toThrow("đã trừ");
+    const bad = structuredClone(data);
+    bad.salaryAdvances![0].amount++;
+    expect(() => restore(serialize(bad))).toThrow();
+    const duplicate = structuredClone(data);
+    duplicate.wageCalculations[0].advances!.push(row);
+    duplicate.wageCalculations[0].advanceTotal! += row.amount;
+    duplicate.wageCalculations[0].netAmount! -= row.amount;
+    expect(() => restore(serialize(duplicate))).toThrow();
+  });
+  it("từ chối tiền ứng không hợp lệ và lưu rõ số dư âm khi ứng vượt lương", () => {
+    for (const amount of [0, -1, 1.5, Infinity, NaN, Number.MAX_SAFE_INTEGER + 1])
+      expect(() => saveAdvance(fixture(), advance(amount))).toThrow();
+    expect(() => saveAdvance(fixture(), advance(1000, "2025-12-31"))).toThrow();
+    const data = finalizeWages(saveAdvance(fixture(), advance(200000)), employee.id, range, 30000, "");
+    expect(data.wageCalculations[0].netAmount).toBe(-95000);
+    expect(restore(serialize(data))).toEqual(data);
+  });
+  it("backup tháng giữ khoản ứng đi kèm lần tính vượt tháng", () => {
+    let data = fixture();
+    data.attendance["2026-12"] = [shift("2026-12-01")];
+    data = saveAdvance(data, advance(30000, "2026-12-01"));
+    data = finalizeWages(data, employee.id, { start: "2026-11-01", end: "2026-12-06" }, 30000, "");
+    const restored = restore(serialize(monthBackup(data, "2026-11")));
+    expect(restored.salaryAdvances).toHaveLength(1);
+    expect(restored.wageCalculations[0].netAmount).toBe(180000);
+  });
   it("3 giờ 30 phút x 30.000 = 105.000đ, chỉ xử lý nhân viên được chọn", () => {
     const data = saveAttendance(fixture(), shift("2026-11-16", "employee-2"));
     const next = finalizeWages(data, employee.id, range, 30000, "Đợt 1");
