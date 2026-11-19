@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from "react";
 import { Calculator, Download, Printer } from "lucide-react";
 import { useApp } from "../../contexts/AppContext";
-import { Badge, Button, Field, Modal, Submit } from "../common/UI";
+import { Button, Field, Modal, Submit } from "../common/UI";
 import { dateLabel, download, duration, money } from "../../utils/format";
 import { salary } from "../../utils/salaryCalculator";
 import { pendingAdvances } from "../../services/advances";
 import { AdvanceForm } from "../attendance/AdvanceForm";
+import { WagePayslip } from "./WagePayslip";
 import {
   csvContent,
   shiftsInRange,
@@ -222,91 +223,15 @@ export function WageCalculator({
       ) : (
         <>
           <div className="modal-body">
-            <div id="print-payslip" className="payslip">
-              <div className="payslip-heading">
-                <div>
-                  <span className="eyebrow">
-                    CÔNG VIỆT · KẾT QUẢ TÍNH LƯƠNG
-                  </span>
-                  <h2>{employee.name}</h2>
-                  <p>{employee.code}</p>
-                </div>
-                <Badge tone="green">Đã tính lương</Badge>
-              </div>
-              <p className="info-note">
-                Các lần tính dưới đây có ca nằm trong khoảng ngày đang xem. Mỗi
-                lần giữ nguyên kỳ, giờ công, đơn giá và số tiền đã xác nhận.
-              </p>
-              {records.map((r) => (
-                <section className="wage-record" key={r.id}>
-                  <div className="wage-record-heading">
-                    <h3>
-                      Kỳ {dateLabel(r.startDate)} – {dateLabel(r.endDate)}
-                    </h3>
-                    <small className="muted">
-                      Tính lúc {dateLabel(r.calculatedAt, "HH:mm dd/MM/yyyy")}
-                    </small>
-                  </div>
-                  <dl className="detail-list">
-                    <div>
-                      <dt>Tổng giờ đã tính</dt>
-                      <dd>
-                        {duration(r.minutes)} · {r.shifts.length} ca
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Đơn giá</dt>
-                      <dd>{money(r.hourlyRate)} / giờ</dd>
-                    </div>
-                    <div>
-                      <dt>Tiền lương</dt>
-                      <dd className="text-blue">{money(r.amount)}</dd>
-                    </div>
-                    <div><dt>Đã ứng</dt><dd>{money(r.advanceTotal ?? 0)}</dd></div>
-                    <div><dt>Thực nhận</dt><dd className="text-blue">{money(r.netAmount ?? r.amount)}</dd></div>
-                  </dl>
-                  {(r.advances ?? []).map((a) => <p className="info-note" key={a.id}>
-                    Ứng ngày {dateLabel(a.date)} · {money(a.amount)}{a.notes && ` · ${a.notes}`}
-                  </p>)}
-                  {r.notes && <p className="info-note">{r.notes}</p>}
-                  <div className="table-wrap">
-                    <table className="compact-table">
-                      <thead>
-                        <tr>
-                          <th>Ngày</th>
-                          <th>Giờ vào / ra</th>
-                          <th>Nghỉ</th>
-                          <th>Giờ thực tế</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {r.shifts.map((s) => (
-                          <tr key={s.id}>
-                            <td>{dateLabel(s.date)}</td>
-                            <td>
-                              {dateLabel(s.start, "HH:mm")} →{" "}
-                              {dateLabel(s.end, "HH:mm")}
-                              {dateLabel(s.end, "yyyy-MM-dd") !== s.date && (
-                                <small>Ra {dateLabel(s.end)}</small>
-                              )}
-                            </td>
-                            <td>{duration(s.breakMinutes)}</td>
-                            <td>{duration(s.actualMinutes)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-              ))}
-            </div>
+            <p className="info-note payslip-screen-note">Mẫu in A4 gồm bảng lương, chi tiết từng ngày công và các khoản ứng đã trừ. Mỗi lần tính lương bắt đầu trên một trang mới.</p>
+            <WagePayslip records={records} company={data.settings.company} />
           </div>
           <footer>
             <Button onClick={exportResults}>
               <Download size={16} /> Xuất kết quả CSV
             </Button>
             <Button className="primary" onClick={() => window.print()}>
-              <Printer size={16} /> In kết quả
+              <Printer size={16} /> In bảng lương A4
             </Button>
           </footer>
         </>

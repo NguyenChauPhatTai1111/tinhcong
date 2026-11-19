@@ -1,0 +1,155 @@
+.payslip-employee {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 18px;
+}
+.payslip-section-title {
+  margin-top: 22px;
+  font-size: 15px;
+}
+.payslip-net {
+  font-weight: 700;
+}
+.payslip-days {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 600px;
+}
+.payslip-days .day-column {
+  width: 17%;
+}
+.payslip-days .shift-column {
+  width: 20%;
+}
+.payslip-days .hours-column {
+  width: 16%;
+}
+.wage-payslip td {
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.wage-payslip td small,
+.payslip-signatures small {
+  display: block;
+}
+.wage-payslip td div + div {
+  margin-top: 8px;
+}
+.payslip-notes {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.payslip-signatures {
+  display: flex;
+  justify-content: space-around;
+  gap: 24px;
+  text-align: center;
+  margin-top: 28px;
+  padding-bottom: 65px;
+}
+.payslip-signatures small {
+  font-style: italic;
+  margin-top: 5px;
+}
+
+@media print {
+  html,
+  body,
+  #root,
+  .app-shell,
+  .main-shell,
+  .main-shell main {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+  dialog.modal:has(.wage-payslip),
+  dialog.modal:has(.wage-payslip) > .modal-body {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+  .payslip-screen-note {
+    display: none !important;
+  }
+  .wage-payslip .payslip-sheet {
+    break-inside: auto;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    margin: 0;
+    font-size: 11pt;
+  }
+  .payslip-sheet + .payslip-sheet {
+    break-before: page;
+  }
+  .wage-payslip .payslip-heading {
+    margin-bottom: 5mm;
+    break-inside: avoid;
+  }
+  .wage-payslip .payslip-heading h2 {
+    font-size: 18pt;
+  }
+  .wage-payslip .eyebrow,
+  .wage-payslip .payslip-heading p,
+  .wage-payslip .payslip-heading > span {
+    font-size: 10pt;
+  }
+  .wage-payslip .detail-list {
+    break-inside: avoid;
+    margin-bottom: 4mm;
+  }
+  .wage-payslip .detail-list div {
+    padding: 2mm 0;
+    font-size: 11pt;
+  }
+  .wage-payslip .payslip-section-title {
+    font-size: 12pt;
+    margin-top: 5mm;
+    break-after: avoid;
+  }
+  .wage-payslip .table-wrap {
+    margin-top: 3mm;
+    border: 0;
+    overflow: visible;
+  }
+  .wage-payslip table {
+    width: 100%;
+    min-width: 0;
+    border-collapse: collapse;
+  }
+  .wage-payslip thead {
+    display: table-header-group;
+  }
+  .wage-payslip tfoot {
+    display: table-row-group;
+  }
+  .wage-payslip th,
+  .wage-payslip td {
+    font-size: 9pt;
+    padding: 2mm !important;
+    border: 1px solid #aaa;
+    white-space: normal;
+  }
+  .wage-payslip td small {
+    font-size: 8pt;
+  }
+  .wage-payslip .info-note {
+    font-size: 9pt;
+    padding: 0;
+  }
+  .wage-payslip tr,
+  .payslip-signatures {
+    break-inside: avoid;
+  }
+  .payslip-signatures {
+    margin-top: 8mm;
+    padding-bottom: 20mm;
+    font-size: 10pt;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 14mm;
+  }
+}
