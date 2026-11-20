@@ -1,3 +1,409 @@
+.save-all-panel {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 22px 24px;
+  margin-bottom: 28px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--blue);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.save-all-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  background: var(--blue-light);
+  color: var(--blue);
+}
+.save-all-copy {
+  flex: 1;
+  min-width: 0;
+}
+.save-all-copy h2 {
+  font-size: 17px;
+  line-height: 1.5;
+  color: var(--heading);
+}
+.save-all-copy p {
+  font-size: 14px;
+  line-height: 1.8;
+  margin-top: 5px;
+  color: var(--text);
+}
+.save-all-copy small {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+  margin-top: 6px;
+}
+.save-all-panel .save-all-button {
+  min-height: 58px;
+  font-size: 16px;
+  padding: 16px 22px;
+  gap: 10px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px #2563eb20;
+  white-space: normal;
+}
+.save-all-button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 4px;
+}
+@media (max-width: 1100px) {
+  .save-all-panel {
+    flex-wrap: wrap;
+  }
+  .save-all-copy {
+    flex-basis: calc(100% - 74px);
+  }
+  .save-all-panel .save-all-button {
+    margin-left: 70px;
+  }
+}
+@media (max-width: 640px) {
+  .save-all-panel {
+    padding: 18px;
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .save-all-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+  }
+  .save-all-copy {
+    flex-basis: calc(100% - 56px);
+  }
+  .save-all-panel .save-all-button {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+@media print {
+  .save-all-panel {
+    display: none !important;
+  }
+}
+
+/* Employee attendance details use cards so all actions fit without horizontal scrolling. */
+.modal.attendance-detail {
+  width: 960px;
+}
+.attendance-detail > header {
+  padding: 24px 28px;
+  align-items: center;
+}
+.attendance-detail > header > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.attendance-detail > header p {
+  font-size: 14px;
+}
+.attendance-detail .attendance-detail-body {
+  display: grid;
+  gap: 32px;
+  padding: 28px;
+  font-size: 16px;
+}
+.attendance-detail .btn {
+  min-height: 44px;
+  font-size: 14px;
+  gap: 8px;
+  padding: 10px 16px;
+  white-space: normal;
+}
+.attendance-detail .icon-btn {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+.detail-overview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.detail-overview > div {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--hover);
+  min-width: 0;
+}
+.detail-overview span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.detail-overview svg {
+  flex-shrink: 0;
+}
+.detail-overview strong {
+  font-size: 22px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.detail-overview small {
+  font-size: 14px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.detail-section + .detail-section {
+  border-top: 1px solid var(--border);
+  padding-top: 28px;
+}
+.detail-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+.detail-section-heading h3 {
+  font-size: 18px;
+  font-weight: 650;
+}
+.detail-section-heading p {
+  font-size: 14px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.detail-section-heading > .btn {
+  flex-shrink: 0;
+}
+.detail-entry-list {
+  display: grid;
+  gap: 16px;
+}
+.detail-shift,
+.detail-advance {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  min-width: 0;
+}
+.detail-entry-heading,
+.detail-advance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.detail-entry-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.detail-entry-title > svg {
+  color: var(--muted);
+}
+.detail-entry-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.attendance-detail .detail-delete {
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.attendance-detail .detail-delete:hover:enabled {
+  color: #dc4545;
+  background: #dc454514;
+  border-color: #dc454560;
+}
+.attendance-detail button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 3px;
+}
+.detail-shift-times {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+.detail-shift-times > div {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--hover);
+}
+.detail-shift-times dt {
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+.detail-shift-times dd {
+  font-size: 18px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.detail-shift-times small {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.detail-shift-times .detail-actual {
+  background: #3478f614;
+  box-shadow: inset 0 0 0 1px #3478f633;
+}
+.detail-shift-notes {
+  border-top: 1px solid var(--border);
+  margin-top: 18px;
+  padding-top: 14px;
+  color: var(--muted);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.detail-shift-notes p {
+  margin-top: 8px;
+  color: var(--text);
+}
+.detail-shift-notes b {
+  font-weight: 500;
+}
+.detail-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: var(--hover);
+  color: var(--muted);
+  font-size: 13px;
+}
+.detail-status.pending {
+  background: #e9a12b18;
+  color: #93600e;
+}
+.dark .detail-status.pending {
+  color: #f4cb80;
+}
+.detail-status.settled {
+  background: #2baf7c18;
+  color: #1e805a;
+}
+.dark .detail-status.settled {
+  color: #7bd5b2;
+}
+.detail-advance-content {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.detail-advance-amount {
+  font-size: 20px;
+}
+.detail-advance-date,
+.detail-advance-content p {
+  color: var(--muted);
+  font-size: 14px;
+}
+.detail-advance-content p {
+  flex-basis: 100%;
+}
+.detail-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 28px 20px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  text-align: center;
+  background: var(--hover);
+}
+.detail-empty > svg {
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.detail-empty h4 {
+  font-size: 16px;
+  font-weight: 600;
+}
+.detail-empty p {
+  color: var(--muted);
+  font-size: 14px;
+  max-width: 400px;
+}
+.attendance-detail > footer {
+  position: sticky;
+  bottom: 0;
+  padding: 16px 28px;
+  z-index: 2;
+}
+@media (max-width: 640px) {
+  .attendance-detail > header {
+    padding: 18px;
+    gap: 10px;
+  }
+  .attendance-detail .attendance-detail-body {
+    padding: 20px 16px;
+    gap: 24px;
+  }
+  .detail-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .detail-overview > div {
+    padding: 14px;
+    gap: 8px;
+  }
+  .detail-overview > div:last-child {
+    grid-column: 1 / -1;
+  }
+  .detail-overview strong {
+    font-size: 20px;
+  }
+  .detail-section-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .detail-shift,
+  .detail-advance {
+    padding: 16px;
+  }
+  .detail-entry-heading,
+  .detail-advance {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .detail-entry-actions > .btn {
+    flex: 1;
+  }
+  .detail-shift-times {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .detail-shift-times > div {
+    padding: 10px;
+  }
+  .detail-shift-times dd {
+    font-size: 16px;
+  }
+  .attendance-detail > footer {
+    padding: 14px 16px;
+  }
+}
+
 /* Main tasks stay visible; helper text is readable on phones and tablets. */
 .monthly-payroll-notice {
   display: flex;

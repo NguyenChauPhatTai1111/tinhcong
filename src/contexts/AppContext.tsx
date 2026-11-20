@@ -9,7 +9,7 @@ import {
 } from "react";
 import type { AppData } from "../types";
 import { ensureMonth } from "../services/storage";
-import { currentMonth, today } from "../utils/format";
+import { currentMonth, download, today } from "../utils/format";
 import { useAuth } from "./AuthContext";
 interface Context {
   data: AppData;
@@ -18,6 +18,8 @@ interface Context {
   date: string;
   storageError: string;
   saving: boolean;
+  saveAllData: () => Promise<void>;
+  lastBackupAt: string | null;
   mutate: (
     fn: (data: AppData) => AppData,
     message?: string,
@@ -27,13 +29,14 @@ interface Context {
 }
 const AppContext = createContext<Context | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
-  const { session, commit } = useAuth();
+  const { session, commit, backup } = useAuth();
   if (!session) throw new Error("Vui lòng đăng nhập.");
   const [data, setData] = useState(() =>
       ensureMonth(session.data, currentMonth()),
     ),
     dataRef = useRef(data);
   const [storageError, setStorageError] = useState(""),
+    [lastBackupAt, setLastBackupAt] = useState<string | null>(null),
     [saving, setSaving] = useState(false),
     inFlight = useRef(false);
   const [month, setMonth] = useState(currentMonth()),
@@ -84,6 +87,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
     [commit, toast],
   );
+  const saveAllData = async () => {
+    if (inFlight.current) {
+      toast("Đang lưu dữ liệu. Vui lòng đợi thao tác trước hoàn tất.", true);
+      return;
+    }
+    inFlight.current = true;
+    setSaving(true);
+    let committed = false;
+    try {
+      const snapshot = structuredClone(dataRef.current);
+      await commit(snapshot);
+      committed = true;
+      setStorageError("");
+      const content = await backup(snapshot);
+      const timestamp = new Date();
+      const stamp = `${today()}-${String(timestamp.getHours()).padStart(2, "0")}${String(timestamp.getMinutes()).padStart(2, "0")}${String(timestamp.getSeconds()).padStart(2, "0")}-${String(timestamp.getMilliseconds()).padStart(3, "0")}`;
+      download(content, `cong-viet-toan-bo-${stamp}.json`, "application/json;charset=utf-8");
+      setLastBackupAt(timestamp.toISOString());
+      toast("Đã lưu toàn bộ dữ liệu và bắt đầu tải bản sao lưu. Hãy giữ file cùng mật khẩu đăng nhập dùng khi tạo bản sao lưu.");
+    } catch (e) {
+      toast(`${committed ? "Dữ liệu đã lưu, nhưng chưa tải được bản sao lưu" : "Chưa lưu được toàn bộ dữ liệu"}: ${(e as Error).message}`, true);
+      if (!committed && e instanceof DOMException && ["QuotaExceededError", "SecurityError"].includes(e.name))
+        setStorageError("Không thể lưu dữ liệu mã hóa. Kiểm tra quyền lưu trữ và dung lượng trình duyệt.");
+    } finally {
+      inFlight.current = false;
+      setSaving(false);
+    }
+  };
   useEffect(() => {
     if (
       !session.data.attendance[currentMonth()] ||
@@ -133,6 +164,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         date,
         storageError,
         saving,
+        saveAllData,
+        lastBackupAt,
         mutate,
         toast,
       }}

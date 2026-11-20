@@ -73,12 +73,46 @@ test("Chuyển dữ liệu cũ sang mã hóa, đăng xuất, chặn URL riêng v
   await expect(page.locator("main")).toHaveCount(0);
   await signIn(page);
   await page.reload();
-  await expect(
-    page.getByRole("heading", { name: "Đăng nhập quản trị viên", exact: true }),
-  ).toBeVisible();
-  await signIn(page);
+  await expect(page.locator("main")).toBeVisible();
   await page.goto("/#/nhan-vien");
   await expect(page.locator("tbody")).toContainText("Nhân viên cần giữ lại");
+});
+
+test("Giữ phiên và đúng trang khi refresh, tải lại bỏ cache; đăng xuất xóa phiên", async ({ page, context }) => {
+  await setupAdmin(page);
+  await page.goto("/#/nhan-vien");
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Quản lý nhân viên", exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/#\/nhan-vien$/);
+  const browserSession = await context.newCDPSession(page);
+  await browserSession.send("Page.reload", { ignoreCache: true });
+  await expect(page.getByRole("heading", { name: "Quản lý nhân viên", exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/#\/nhan-vien$/);
+  await browserSession.detach();
+  await page.getByRole("button", { name: "Đăng xuất", exact: true }).click();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Đăng nhập quản trị viên", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => sessionStorage.getItem("congviet:tab-session"))).toBeNull();
+  await signIn(page);
+  await page.reload();
+  await expect(page.locator("main")).toBeVisible();
+});
+
+test("Refresh không mở lại phiên đã hết hạn hoặc phiên hỏng", async ({ page }) => {
+  await setupAdmin(page);
+  await page.evaluate(() => {
+    const saved = JSON.parse(sessionStorage.getItem("congviet:tab-session")!);
+    saved.lastActive = Date.now() - 16 * 60 * 1000;
+    sessionStorage.setItem("congviet:tab-session", JSON.stringify(saved));
+  });
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Đăng nhập quản trị viên", exact: true })).toBeVisible();
+  await signIn(page);
+  await page.evaluate(() => sessionStorage.setItem("congviet:tab-session", "invalid"));
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Đăng nhập quản trị viên", exact: true })).toBeVisible();
+  await signIn(page);
+  await expect(page.locator("main")).toBeVisible();
 });
 
 test("Ghi mã hóa thất bại không xóa dữ liệu cũ hoặc báo đăng nhập thành công", async ({

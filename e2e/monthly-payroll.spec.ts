@@ -108,7 +108,7 @@ test("Đầu năm mới bắt tính xong lương cũ cho tất cả người là
   await addShift("Nguyễn Văn Huy · NV001", "2027-01-01");
   await expect(page.locator("tbody")).toContainText("3 giờ 30 phút");
   await page.reload();
-  await signIn(page);
+  await expect(page.locator("main")).toBeVisible();
   await expect(page.locator("main>.monthly-payroll-notice")).toHaveCount(0);
   const data = await readData(page);
   expect(data.attendance["2026-12"]).toHaveLength(2);

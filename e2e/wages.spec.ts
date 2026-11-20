@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { readData, setupAdmin, signIn } from "./helpers";
+import { readData, setupAdmin } from "./helpers";
 test("Nút tính lương từng người: xác nhận, khóa sau khi lưu, không trùng kỳ và tính ca mới", async ({
   page,
 }) => {
@@ -99,7 +99,7 @@ test("Nút tính lương từng người: xác nhận, khóa sau khi lưu, khôn
     mai.getByRole("button", { name: "Tính lương", exact: true }),
   ).toBeEnabled();
   await page.reload();
-  await signIn(page);
+  await expect(page.locator("main")).toBeVisible();
   await expect(
     huy.getByRole("button", { name: "Đã tính lương", exact: true }),
   ).toBeDisabled();

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { readData, setupAdmin, signIn } from "./helpers";
+import { readData, setupAdmin } from "./helpers";
 
 test("Gom chấm công theo nhân viên, ghi ứng từ chấm công và tính lương, trừ một lần", async ({ page }) => {
   const errors: string[] = [];
@@ -26,7 +26,13 @@ test("Gom chấm công theo nhân viên, ghi ứng từ chấm công và tính l
   await page.getByLabel("Giờ kết thúc *").fill("12:00");
   await page.getByRole("button", { name: "Lưu chấm công", exact: true }).click();
   await expect(page.locator("dialog")).toHaveCount(1);
-  await expect(page.locator("dialog tbody")).toContainText("16/11/2026");
+  await expect(page.getByRole("article", { name: "Ca làm 16/11/2026" })).toContainText("08:00");
+  await expect(page.getByRole("article", { name: "Ca làm 16/11/2026" })).toContainText("12:00");
+  await page.getByRole("button", { name: "Sửa ca Huy 2026-11-16", exact: true }).click();
+  await expect(page.getByLabel("Giờ bắt đầu *")).toHaveValue("08:00");
+  await page.getByRole("button", { name: "Lưu chấm công", exact: true }).click();
+  await expect(page.locator("dialog")).toHaveCount(1);
+  await expect.poll(() => page.locator(".attendance-detail").evaluate((el) => el.scrollWidth <= el.clientWidth)).toBeTruthy();
   await page.locator("dialog").getByRole("button", { name: "Ghi nhận ứng lương", exact: true }).click();
   await page.getByLabel("Ngày ứng lương *").fill("2026-11-16");
   await page.getByLabel("Số tiền ứng (đ) *").fill("30000");
@@ -38,6 +44,11 @@ test("Gom chấm công theo nhân viên, ghi ứng từ chấm công và tính l
   await page.getByLabel("Số tiền ứng (đ) *").fill("40000");
   await page.getByRole("button", { name: "Lưu ứng lương" }).click();
   await expect(page.locator("dialog")).toHaveCount(1);
+  await page.setViewportSize({ width: 1100, height: 1000 });
+  await page.locator(".attendance-detail").screenshot({ path: "artifacts/cham-cong-chi-tiet-light.png" });
+  await page.evaluate(() => document.documentElement.classList.add("dark"));
+  await page.locator(".attendance-detail").screenshot({ path: "artifacts/cham-cong-chi-tiet-dark.png" });
+  await page.evaluate(() => document.documentElement.classList.remove("dark"));
   await page.getByRole("button", { name: "Đóng", exact: true }).last().click();
   await page.goto("/#/tong-hop");
   const row = page.locator("tbody>tr").filter({ hasText: "Huy" });
@@ -57,12 +68,15 @@ test("Gom chấm công theo nhân viên, ghi ứng từ chấm công và tính l
   await expect(page.locator("#print-payslip")).toContainText("70.000đ");
   await page.getByRole("button", { name: "Đóng", exact: true }).click();
   await page.reload();
-  await signIn(page);
+  await expect(page.locator("main")).toBeVisible();
   await page.goto("/#/cham-cong");
   await page.getByRole("button", { name: "Huy NV001" }).click();
   await expect(page.getByRole("button", { name: "Sửa khoản ứng 2026-11-16" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Xóa khoản ứng 2026-11-17" })).toBeDisabled();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  await expect.poll(() => page.locator(".attendance-detail").evaluate((el) => el.scrollWidth <= el.clientWidth)).toBeTruthy();
+  await expect(page.getByRole("button", { name: "Sửa ca Huy 2026-11-16", exact: true })).toBeDisabled();
+  await page.screenshot({ path: "artifacts/cham-cong-chi-tiet-mobile.png" });
   expect(errors).toEqual([]);
 });

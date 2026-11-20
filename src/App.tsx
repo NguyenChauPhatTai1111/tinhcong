@@ -66,8 +66,10 @@ export default function App() {
   );
 }
 function AuthGate({ children }: { children: ReactNode }) {
-  const { session } = useAuth(),
+  const { session, restoring } = useAuth(),
     location = useLocation();
+  if (restoring)
+    return <div className="app-loading"><span className="loading-circle" /><p>Đang mở không gian làm việc…</p></div>;
   if (!session)
     return location.pathname === "/dang-nhap" ? (
       <Login />

@@ -24,11 +24,19 @@ import {
   type OpenVault,
 } from "../services/security/vault";
 import { currentMonth } from "../utils/format";
+import {
+  clearTabSession,
+  IDLE_LOCK_MS,
+  restoreTabSession,
+  saveTabSession,
+  touchTabSession,
+} from "../services/security/session";
 
-export const IDLE_LOCK_MS = 15 * 60 * 1000;
+export { IDLE_LOCK_MS } from "../services/security/session";
 type Session = OpenVault & { id: string; raw: string };
 interface Auth {
   session: Session | null;
+  restoring: boolean;
   mode: "setup" | "login" | "recovery";
   issue: string;
   notice: string;
@@ -81,20 +89,27 @@ async function exclusive<T>(fn: () => Promise<T>): Promise<T> {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState(inspect),
     [session, setSession] = useState<Session | null>(null),
+    [restoring, setRestoring] = useState(true),
     [notice, setNotice] = useState("");
   const ref = useRef<Session | null>(null),
     active = useRef(performance.now()),
     working = useRef(false);
   const lock = useCallback((reason = "Đã đăng xuất. Dữ liệu đã được khóa.") => {
+    clearTabSession();
     ref.current = null;
     setSession(null);
     setState(inspect());
     setNotice(reason);
     document.documentElement.classList.remove("dark");
   }, []);
-  function establish(open: OpenVault, raw: string) {
+  async function establish(open: OpenVault, raw: string) {
     const next = { ...open, raw, id: crypto.randomUUID() };
     ref.current = next;
+    await saveTabSession(open);
+    if (ref.current !== next) {
+      clearTabSession();
+      return;
+    }
     active.current = performance.now();
     setSession(next);
     setNotice("");
@@ -108,7 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         );
       localStorage.setItem(STORAGE_KEY, raw);
     });
-    establish(open, raw);
+    await establish(open, raw);
   }
   async function setup(
     username: string,
@@ -142,7 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     if (localStorage.getItem(STORAGE_KEY) !== raw)
       throw new Error("Dữ liệu đã thay đổi. Hãy đăng nhập lại.");
-    establish(open, raw);
+    await establish(open, raw);
   }
   const commit = useCallback(
     async (data: AppData) => {
@@ -215,6 +230,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
   useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const open = await restoreTabSession(raw);
+        if (cancelled) return;
+        if (open && raw && localStorage.getItem(STORAGE_KEY) === raw) {
+          const next = { ...open, raw, id: crypto.randomUUID() };
+          ref.current = next;
+          active.current = performance.now() - Math.max(0, Date.now() - open.lastActive);
+          setSession(next);
+        }
+      } catch {
+        clearTabSession();
+      } finally {
+        if (!cancelled) setRestoring(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY || e.key === null)
         lock("Dữ liệu hoặc tài khoản đã đổi ở tab khác. Hãy đăng nhập lại.");
@@ -232,7 +268,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return false;
     };
     const activity = () => {
-      if (!check()) active.current = performance.now();
+      if (!check()) {
+        active.current = performance.now();
+        touchTabSession();
+      }
     };
     const events = ["pointerdown", "keydown", "touchstart", "scroll"] as const;
     for (const event of events)
@@ -255,6 +294,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         session,
+        restoring,
         ...state,
         notice,
         setup,

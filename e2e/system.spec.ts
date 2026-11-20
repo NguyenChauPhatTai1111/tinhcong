@@ -5,7 +5,6 @@ import {
   fillSetup,
   readData,
   setupAdmin,
-  signIn,
 } from "./helpers";
 const errors = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page }) => {
@@ -70,13 +69,13 @@ test("Giờ công theo hội thoại: nghỉ linh hoạt, tuần/tháng/khoảng
   await addShift(page, "2026-11-16", "04:00", "08:00", "0,5");
   await expect(page.locator("tbody")).toContainText("3 giờ 30 phút");
   await page.getByRole("button", { name: "Xem chấm công" }).click();
-  await expect(page.locator("dialog tbody")).toContainText("Có nghỉ trưa");
+  await expect(page.locator("dialog .detail-entry-list")).toContainText("Có nghỉ trưa");
   await page.getByRole("button", { name: "Đóng", exact: true }).last().click();
   await addShift(page, "2026-11-17", "04:00", "09:00");
   await addShift(page, "2026-11-18", "20:00", "06:00", "1.5");
   await page.getByRole("button", { name: "Xem chấm công" }).click();
-  await expect(page.locator("dialog tbody")).toContainText("8 giờ 30 phút");
-  await expect(page.locator("dialog tbody")).toContainText("Không nghỉ trưa");
+  await expect(page.locator("dialog .detail-entry-list")).toContainText("8 giờ 30 phút");
+  await expect(page.locator("dialog .detail-entry-list")).toContainText("Không nghỉ trưa");
   await page.getByRole("button", { name: "Đóng", exact: true }).last().click();
   await page.getByRole("button", { name: "Xem lịch" }).click();
   await expect(
@@ -128,7 +127,7 @@ test("Giờ công theo hội thoại: nghỉ linh hoạt, tuần/tháng/khoảng
   await page.goto("/#/tong-hop");
   await expect(page.getByTestId("summary-worked")).toHaveText("13 giờ");
   await page.reload();
-  await signIn(page);
+  await expect(page.locator("main")).toBeVisible();
   await expect(page.getByTestId("summary-worked")).toHaveText("13 giờ");
   const data = await readData(page);
   expect(data.version).toBe(4);
@@ -218,7 +217,7 @@ test("Responsive và chế độ tối, giao diện không có chức năng tín
     .click();
   await expect(page.locator("html")).toHaveClass("dark");
   await page.reload();
-  await signIn(page);
+  await expect(page.locator("main")).toBeVisible();
   await expect(page.locator("html")).toHaveClass("dark");
   await expect(page.getByRole('heading', { name: 'Tổng hợp giờ công', exact: true })).toBeVisible();
   await page.screenshot({

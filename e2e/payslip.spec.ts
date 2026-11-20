@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { ADMIN_PASSWORD, setupAdmin, signIn } from "./helpers";
+import { ADMIN_PASSWORD, setupAdmin } from "./helpers";
 
 test("In bảng lương A4 đủ ngày công, ứng lương và nhiều trang từ dữ liệu đã chốt", async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-11-18T03:00:00Z"));
@@ -39,7 +39,7 @@ test("In bảng lương A4 đủ ngày công, ứng lương và nhiều trang t�
     localStorage.setItem("congviet:data", JSON.stringify(await encryptVault(data, session.key, session.envelope)));
   }, ADMIN_PASSWORD);
   await page.reload();
-  await signIn(page);
+  await expect(page.locator("main")).toBeVisible();
   await page.goto("/#/tong-hop");
   await page.getByRole("button", { name: "Xem kết quả", exact: true }).click();
   const payslip = page.locator("#print-payslip");

@@ -23,6 +23,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { HelpProvider } from "../../contexts/HelpContext";
 import { HelpCenter } from "../common/HelpCenter";
 import { MonthlyPayrollNotice } from "../common/MonthlyPayrollNotice";
+import { SaveAllData } from "../common/SaveAllData";
 const nav = [
   { path: "/", title: "Tổng quan", icon: LayoutDashboard },
   { path: "/nhan-vien", title: "Nhân viên", icon: Users },
@@ -182,6 +183,7 @@ export function Layout() {
             </div>
           </header>
           <main>
+            <SaveAllData />
             <MonthlyPayrollNotice targetMonth={date.slice(0, 7)} />
             {storageError && (
               <div role="alert" className="alert error">

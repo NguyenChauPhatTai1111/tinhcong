@@ -2,6 +2,8 @@ import { useState } from "react";
 import { format, parseISO } from "date-fns";
 import {
   CalendarDays,
+  Clock3,
+  Wallet,
   List,
   Pencil,
   Plus,
@@ -50,6 +52,8 @@ export default function Attendance() {
     return (data.attendance[month] ?? []).some((s) => s.employeeId === id) || monthAdvances.some((a) => a.employeeId === id);
   }
   const selectedEmployee = data.employees.find((e) => e.id === detail);
+  const detailAdvances = monthAdvances.filter((a) => a.employeeId === detail)
+    .sort((a, b) => b.date.localeCompare(a.date));
   const calculatedIds = calculatedShiftIds(data);
   const filtered = (data.attendance[month] ?? []).filter((s) => {
     const e = data.employees.find((e) => e.id === s.employeeId);
@@ -65,6 +69,7 @@ export default function Attendance() {
   const rows = filtered
     .filter((s) => !activeDate || activeDate === s.date)
     .sort((a, b) => b.start.localeCompare(a.start));
+  const detailShifts = rows.filter((s) => s.employeeId === detail);
   const selectedDate =
     activeDate || (today().startsWith(month) ? today() : `${month}-01`);
   const openNew = () => setForm("new");
@@ -350,22 +355,51 @@ export default function Attendance() {
           <strong>{duration(sum(rows, (s) => s.actualMinutes))}</strong>
         </div>
       </section>
-      {selectedEmployee && <Modal title={`Chấm công · ${selectedEmployee.name}`} subtitle={`${selectedEmployee.code} · Tháng ${month.slice(5)}/${month.slice(0, 4)}`} wide onClose={() => setDetail(null)}>
-        <div className="modal-body">
-          <div className="section-heading"><div><h3>Các ngày đã chấm công</h3>
-            <p>{activeDate ? `Đang lọc ngày ${dateLabel(activeDate)}` : "Các ca làm trong tháng đang chọn."}</p></div>
-            <Button className="primary" onClick={openNew}>Thêm ca làm</Button></div>
-          {table(rows.filter((s) => s.employeeId === detail))}
-          <div className="section-heading"><h3>Ứng lương trong tháng</h3>
-            <Button disabled={saving || !selectedEmployee.active || selectedEmployee.archived} onClick={() => setAdvanceForm("new")}>Ghi nhận ứng lương</Button></div>
-          {monthAdvances.some((a) => a.employeeId === detail) ? <div className="table-wrap"><table className="responsive-table">
-            <thead><tr><th>Ngày ứng</th><th>Số tiền</th><th>Ghi chú</th><th>Trạng thái</th><th /></tr></thead>
-            <tbody>{monthAdvances.filter((a) => a.employeeId === detail).sort((a, b) => b.date.localeCompare(a.date)).map((a) =>
-              <tr key={a.id}><td data-label="Ngày ứng">{dateLabel(a.date)}</td><td data-label="Số tiền">{money(a.amount)}</td>
-                <td data-label="Ghi chú">{a.notes || "—"}</td><td data-label="Trạng thái">{deductedIds.has(a.id) ? "Đã trừ vào lương" : "Chưa trừ vào lương"}</td>
-                <td className="actions"><button className="icon-btn" aria-label={`Sửa khoản ứng ${a.date}`} disabled={saving || deductedIds.has(a.id)} onClick={() => setAdvanceForm(a)}><Pencil size={16} /></button>
-                <button className="icon-btn red" aria-label={`Xóa khoản ứng ${a.date}`} disabled={saving || deductedIds.has(a.id)} onClick={() => setDeletingAdvance(a)}><Trash2 size={16} /></button></td></tr>)}</tbody>
-          </table></div> : <p className="info-note">Chưa có khoản ứng trong tháng này.</p>}
+      {selectedEmployee && <Modal title={`Chấm công · ${selectedEmployee.name}`} subtitle={`${selectedEmployee.code} · Tháng ${month.slice(5)}/${month.slice(0, 4)}`} wide className="attendance-detail" onClose={() => setDetail(null)}>
+        <div className="modal-body attendance-detail-body">
+          <div className="detail-overview" aria-label="Tóm tắt chấm công">
+            <div><span><CalendarDays size={17} />{activeDate ? "Ngày đang lọc" : "Ngày đã chấm"}</span><strong>{new Set(detailShifts.map((s) => s.date)).size}<small> ngày · {detailShifts.length} ca</small></strong></div>
+            <div><span><Clock3 size={17} />{activeDate ? "Giờ thực tế đang lọc" : "Giờ thực tế"}</span><strong>{duration(sum(detailShifts, (s) => s.actualMinutes))}</strong></div>
+            <div><span><Wallet size={17} />Đã ứng trong tháng</span><strong>{money(sum(detailAdvances, (a) => a.amount))}</strong></div>
+          </div>
+          <section className="detail-section" aria-labelledby="detail-shifts-title">
+            <div className="detail-section-heading">
+              <div><h3 id="detail-shifts-title">Các ngày đã chấm công</h3><p>{activeDate ? `Đang lọc ngày ${dateLabel(activeDate)}` : "Các ca làm trong tháng, mới nhất ở trên."}</p></div>
+              <Button className="primary" onClick={openNew}><Plus size={18} />Thêm ca làm</Button>
+            </div>
+            {detailShifts.length ? <div className="detail-entry-list">{detailShifts.map((s) => {
+              const calculated = calculatedIds.has(s.id);
+              return <article className="detail-shift" key={s.id} aria-label={`Ca làm ${dateLabel(s.date)}`}>
+                <div className="detail-entry-heading">
+                  <div className="detail-entry-title"><CalendarDays size={18} /><strong>{dateLabel(s.date)}</strong>{calculated && <span className="detail-status"><LockKeyhole size={14} />Đã tính lương</span>}</div>
+                  <div className="detail-entry-actions">
+                    <button type="button" className="btn" aria-label={`Sửa ca ${selectedEmployee.name} ${s.date}`} disabled={saving || calculated} title={calculated ? "Ca đã tính lương" : "Sửa ca làm"} onClick={() => setForm(s)}><Pencil size={16} />Sửa ca</button>
+                    <button type="button" className="icon-btn detail-delete" aria-label={`Xóa ca ${selectedEmployee.name} ${s.date}`} disabled={saving || calculated} title={calculated ? "Ca đã tính lương" : "Xóa ca làm"} onClick={() => setDeleting(s)}><Trash2 size={17} /></button>
+                  </div>
+                </div>
+                <dl className="detail-shift-times">
+                  <div><dt>Giờ vào</dt><dd>{dateLabel(s.start, "HH:mm")}</dd></div>
+                  <div><dt>Giờ ra</dt><dd>{dateLabel(s.end, "HH:mm")}</dd>{dateLabel(s.end, "yyyy-MM-dd") !== s.date && <small>Ngày {dateLabel(s.end)}</small>}</div>
+                  <div><dt>Thời gian nghỉ</dt><dd>{s.breakMinutes ? hours(s.breakMinutes) : "Không nghỉ"}</dd></div>
+                  <div className="detail-actual"><dt>Giờ thực tế</dt><dd>{duration(s.actualMinutes)}</dd></div>
+                </dl>
+                <div className="detail-shift-notes"><span>{lunchLabel(s)}</span>{s.notes && <p><b>Ghi chú:</b> {s.notes}</p>}{s.adjustmentReason && <p><b>Điều chỉnh giờ:</b> {s.adjustmentReason}</p>}</div>
+              </article>;
+            })}</div> : <div className="detail-empty"><CalendarDays size={25} /><h4>Chưa có ca làm trong thời gian này</h4><p>Bấm “Thêm ca làm” để bắt đầu chấm công cho nhân viên.</p></div>}
+          </section>
+          <section className="detail-section" aria-labelledby="detail-advances-title">
+            <div className="detail-section-heading">
+              <div><h3 id="detail-advances-title">Ứng lương trong tháng</h3><p>Theo dõi các khoản ứng và trạng thái trừ vào lương.</p></div>
+              <Button disabled={saving || !selectedEmployee.active || selectedEmployee.archived} onClick={() => setAdvanceForm("new")}><Plus size={18} />Ghi nhận ứng lương</Button>
+            </div>
+            {detailAdvances.length ? <div className="detail-entry-list">{detailAdvances.map((a) => <article key={a.id} className="detail-advance" aria-label={`Khoản ứng ${dateLabel(a.date)}`}>
+              <div className="detail-advance-content"><strong className="detail-advance-amount">{money(a.amount)}</strong><span className="detail-advance-date">Ngày ứng: {dateLabel(a.date)}</span><span className={`detail-status ${deductedIds.has(a.id) ? "settled" : "pending"}`}>{deductedIds.has(a.id) ? "Đã trừ vào lương" : "Chưa trừ vào lương"}</span>{a.notes && <p>{a.notes}</p>}</div>
+              <div className="detail-entry-actions">
+                <button type="button" className="btn" aria-label={`Sửa khoản ứng ${a.date}`} disabled={saving || deductedIds.has(a.id)} onClick={() => setAdvanceForm(a)}><Pencil size={16} />Sửa</button>
+                <button type="button" className="icon-btn detail-delete" aria-label={`Xóa khoản ứng ${a.date}`} disabled={saving || deductedIds.has(a.id)} onClick={() => setDeletingAdvance(a)}><Trash2 size={17} /></button>
+              </div>
+            </article>)}</div> : <div className="detail-empty"><Wallet size={25} /><h4>Chưa có khoản ứng trong tháng này.</h4><p>Khi nhân viên ứng lương, bấm “Ghi nhận ứng lương” để lưu lại.</p></div>}
+          </section>
         </div>
         <footer><Button onClick={() => setDetail(null)}>Đóng</Button></footer>
       </Modal>}
